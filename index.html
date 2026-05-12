@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>美元理财 · 收益追踪</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Plotly.js 图表库 -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+
+<body>
+
+<!-- ==================== 顶部导航栏 ==================== -->
+<header>
+    <div class="container header-inner">
+        <div class="logo"><span>USD</span> 收益追踪</div>
+        <nav>
+            <button class="nav-tab active" data-view="purchase">购买记录</button>
+            <button class="nav-tab" data-view="calculator">收益计算</button>
+            <button class="nav-tab" data-view="records">计算记录</button>
+            <button class="nav-tab" data-view="charts">数据可视</button>
+        </nav>
+    </div>
+</header>
+
+
+<main class="container">
+
+    <!-- ================================================================
+         视图1：购买记录
+         - 记录每次买入的日期、汇率、数量
+         - 作为后续收益计算的基准数据
+    ================================================================= -->
+    <section id="view-purchase" class="view-section active">
+        <h1 class="page-title">购买记录</h1>
+        <p class="page-subtitle">记录每一次美元买入，作为收益计算的基准</p>
+
+        <!-- 新增购买记录表单 -->
+        <div class="card">
+            <div class="card-title">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                新增记录
+            </div>
+            <form id="purchase-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="purchase-date">买入日期</label>
+                        <input type="date" id="purchase-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchase-rate">买入汇率</label>
+                        <input type="number" id="purchase-rate" step="0.0001" min="0.0001"
+                               placeholder="例如: 7.2000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchase-amount">买入数量（美元）</label>
+                        <input type="number" id="purchase-amount" step="0.01" min="0.01"
+                               placeholder="例如: 150" required>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">添加记录</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 购买记录列表 -->
+        <div class="card">
+            <div class="card-title">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                记录列表
+            </div>
+            <div class="toolbar">
+                <div class="toolbar-info">共 <span id="purchase-count">0</span> 条记录</div>
+                <button id="purchase-delete-btn" class="btn btn-danger" disabled>删除选中</button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" class="custom-checkbox" id="purchase-select-all"></th>
+                            <th>日期</th>
+                            <th>买入汇率</th>
+                            <th>买入数量</th>
+                            <th>成本（人民币）</th>
+                        </tr>
+                    </thead>
+                    <tbody id="purchase-list">
+                        <tr>
+                            <td colspan="5" class="empty-state">
+                                <p>暂无购买记录</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ================================================================
+         视图2：收益计算
+         - 输入当前持有情况和汇率
+         - 自动计算理财收益 + 汇率盈亏 + 总收益率
+    ================================================================= -->
+    <section id="view-calculator" class="view-section">
+        <h1 class="page-title">收益计算</h1>
+        <p class="page-subtitle">输入当前持有情况，一键计算理财与汇率的综合收益</p>
+
+        <div class="card">
+            <div class="card-title">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="5" width="16" height="16" rx="2"></rect>
+                    <line x1="16" y1="3" x2="16" y2="7"></line>
+                    <line x1="8" y1="3" x2="8" y2="7"></line>
+                    <line x1="4" y1="11" x2="20" y2="11"></line>
+                    <line x1="11" y1="15" x2="12" y2="15"></line>
+                    <line x1="12" y1="15" x2="12" y2="18"></line>
+                </svg>
+                计算参数
+            </div>
+
+            <!-- 统计信息提示 -->
+            <div class="alert alert-info" style="margin-bottom: 20px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                平均成本汇率: <strong id="calc-avg-rate">—</strong> &nbsp;|&nbsp;
+                累计持仓: <strong id="calc-total-holding">—</strong>
+            </div>
+
+            <!-- 计算参数表单 -->
+            <form id="calculator-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="calc-date">计算日期</label>
+                        <input type="date" id="calc-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="calc-holding">持有美元数量</label>
+                        <input type="number" id="calc-holding" step="0.01" min="0.01"
+                               placeholder="例如: 150" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="calc-current-rate">当前汇率</label>
+                        <input type="number" id="calc-current-rate" step="0.0001" min="0.0001"
+                               placeholder="例如: 7.3500" required>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">计算收益</button>
+                    <button type="button" id="calc-save-btn" class="btn btn-secondary" disabled>保存结果</button>
+                </div>
+            </form>
+
+            <!-- 计算结果展示区域 -->
+            <div id="calc-result" style="display: none; margin-top: 28px;">
+                <!-- 动态插入计算结果 -->
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ================================================================
+         视图3：历史计算记录
+         - 展示所有保存的计算结果
+         - 支持批量删除操作
+    ================================================================= -->
+    <section id="view-records" class="view-section">
+        <h1 class="page-title">计算记录</h1>
+        <p class="page-subtitle">保存的历史计算结果，支持批量删除</p>
+
+        <div class="card">
+            <div class="toolbar">
+                <div class="toolbar-info">共 <span id="records-count">0</span> 条记录</div>
+                <button id="records-delete-btn" class="btn btn-danger" disabled>删除选中</button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" class="custom-checkbox" id="records-select-all"></th>
+                            <th>日期</th>
+                            <th>持有数量</th>
+                            <th>当前汇率</th>
+                            <th>理财收益</th>
+                            <th>理财收益率</th>
+                            <th>汇率盈亏</th>
+                            <th>汇率收益率</th>
+                            <th>总盈亏</th>
+                            <th>总收益率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="records-list">
+                        <tr>
+                            <td colspan="10" class="empty-state">
+                                <p>暂无计算记录</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ================================================================
+         视图4：数据可视化
+         - 核心指标卡片：当前累计收益、最高/最低收益率、当前汇率
+         - 趋势图表：汇率走势、理财收益、总盈亏等
+    ================================================================= -->
+    <section id="view-charts" class="view-section">
+        <h1 class="page-title">数据可视</h1>
+        <p class="page-subtitle">以图表直观呈现汇率走势与收益变化</p>
+
+        <!-- 核心指标模块 -->
+        <div class="core-metrics" id="core-metrics-section">
+            <div class="metrics-header">
+                <span class="icon">📊</span>
+                <h3>核心指标</h3>
+                <button class="refresh-btn" id="refresh-metrics-btn" title="刷新数据">
+                    🔄 刷新
+                </button>
+            </div>
+            <div class="metrics-grid" id="core-metrics-grid">
+                <!-- 动态生成4个指标卡片：
+                     1. 当前累计收益（最新一次计算的总盈亏）
+                     2. 最高总收益率
+                     3. 最低总收益率
+                     4. 当前汇率（最新一次使用的汇率）
+                -->
+            </div>
+        </div>
+
+        <!-- 图表网格 -->
+        <div class="charts-grid">
+
+            <!-- 汇率走势图 -->
+            <div class="chart-container">
+                <div class="chart-title">汇率走势</div>
+                <div class="chart-desc">历次计算时记录的当前汇率变化</div>
+                <div id="chart-exchange-trend" class="chart-box"></div>
+            </div>
+
+            <!-- 汇率盈亏趋势图 -->
+            <div class="chart-container">
+                <div class="chart-title">汇率盈亏趋势</div>
+                <div class="chart-desc">历次计算的汇率盈亏变化</div>
+                <div id="chart-exchange-profit-trend" class="chart-box"></div>
+            </div>
+
+            <!-- 理财收益趋势图 -->
+            <div class="chart-container">
+                <div class="chart-title">理财收益趋势</div>
+                <div class="chart-desc">历次计算的理财收益变化</div>
+                <div id="chart-financial-income-trend" class="chart-box"></div>
+            </div>
+
+            <!-- 收益率趋势图（三线对比） -->
+            <div class="chart-container">
+                <div class="chart-title">收益率趋势</div>
+                <div class="chart-desc">理财收益率、汇率收益率与总收益率的变化趋势</div>
+                <div id="chart-yield-trend" class="chart-box"></div>
+            </div>
+
+            <!-- 总盈亏趋势图（全宽） -->
+            <div class="chart-container" style="grid-column: 1 / -1;">
+                <div class="chart-title">总盈亏趋势</div>
+                <div class="chart-desc">历次计算的总盈亏累积变化</div>
+                <div id="chart-profit-trend" class="chart-box"></div>
+            </div>
+
+        </div>
+    </section>
+
+</main>
+
+
+<!-- ==================== JavaScript 模块 ==================== -->
+<script src="js/storage.js"></script>   <!-- 数据访问层（API调用） -->
+<script src="js/calculator.js"></script> <!-- 收益计算逻辑 -->
+<script src="js/charts.js"></script>     <!-- 数据可视化（Plotly图表） -->
+<script src="js/app.js"></script>        <!-- 主应用逻辑（事件绑定、视图切换） -->
+
+</body>
+</html>
