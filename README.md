@@ -46,8 +46,7 @@
 ├── database.js             # MySQL 数据库连接配置
 ├── package.json            # Node.js 依赖配置
 │
-├── start.bat               # ⭐ Windows 启动脚本（标准版）
-├── 快速启动.bat             # ⭐ Windows 启动脚本（自动打开浏览器）
+├── 快速启动.bat             # ⭐ Windows 一键启动脚本（后台运行）
 ├── .gitignore              # Git 忽略配置
 │
 ├── css/
@@ -183,14 +182,13 @@ INSERT INTO config (id) VALUES (1);
 
 **Windows 用户：双击运行**
 
-- 📄 `start.bat` - 标准启动（显示详细日志）
-- 📄 `快速启动.bat` - 一键启动并自动打开浏览器
+- 📄 `快速启动.bat` - 一键启动（后台静默运行 + 自动打开浏览器）
 
-双击任意一个脚本即可自动：
+双击即可自动：
 1. ✅ 检查 Node.js 环境
 2. ✅ 自动安装依赖（首次）
-3. ✅ 启动服务器
-4. ✅ 打开浏览器（仅快速启动.bat）
+3. ✅ 后台启动服务器（无命令行窗口）
+4. ✅ 自动打开浏览器访问 http://localhost:3000
 
 #### 方式 B：手动命令行启动
 
