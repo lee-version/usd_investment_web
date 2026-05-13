@@ -452,24 +452,25 @@ class Charts {
 
             // 计算核心指标
             let currentTotalProfit = 0;
-            let maxTotalROI = -Infinity;
-            let minTotalROI = Infinity;
+            let maxTotalProfit = -Infinity;
+            let minTotalProfit = Infinity;
             let currentRate = config && config.currentRate ? config.currentRate : 0;
 
             if (historyRecords.length > 0) {
                 // 取最新一条记录的累计收益（history_records 已按 query_time DESC 排序，第一条就是最新的）
                 const latestRecord = historyRecords[0];
                 currentTotalProfit = latestRecord.totalProfitCNY || 0;
-                
+
                 // 当前汇率也优先使用最新记录的汇率
                 if (latestRecord.currentRate && latestRecord.currentRate > 0) {
                     currentRate = latestRecord.currentRate;
                 }
 
-                // 计算最高和最低总收益率
+                // 计算最高和最低总收益（绝对金额，不使用收益率）
                 historyRecords.forEach(r => {
-                    if (r.totalROI > maxTotalROI) maxTotalROI = r.totalROI;
-                    if (r.totalROI < minTotalROI) minTotalROI = r.totalROI;
+                    const profit = r.totalProfitCNY || 0;
+                    if (profit > maxTotalProfit) maxTotalProfit = profit;
+                    if (profit < minTotalProfit) minTotalProfit = profit;
                 });
             }
 
@@ -508,20 +509,20 @@ class Charts {
                 <div class="metric-card">
                     <div class="metric-label">
                         <span class="icon">📈</span>
-                        最高总收益率
+                        最高总收益
                     </div>
                     <div class="metric-value positive">
-                        ${maxTotalROI !== -Infinity ? formatPercent(maxTotalROI) : '--'}
+                        ${maxTotalProfit !== -Infinity ? formatCurrency(maxTotalProfit) : '--'}
                     </div>
                 </div>
 
                 <div class="metric-card">
                     <div class="metric-label">
                         <span class="icon">📉</span>
-                        最低总收益率
+                        最低总收益
                     </div>
                     <div class="metric-value negative">
-                        ${minTotalROI !== Infinity ? formatPercent(minTotalROI) : '--'}
+                        ${minTotalProfit !== Infinity ? formatCurrency(minTotalProfit) : '--'}
                     </div>
                 </div>
 
