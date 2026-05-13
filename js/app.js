@@ -398,21 +398,21 @@ class App {
                     <div class="value ${result.financialIncome >= 0 ? 'positive' : 'negative'}">
                         ${result.financialIncome >= 0 ? '+' : ''}¥${Calculator.formatCurrency(result.financialIncome)}
                     </div>
-                    <div class="sub-value">收益率: ${Calculator.formatPercent(result.financialYield)}%</div>
+                    <div class="sub-value">收益率: ${Calculator.formatPercent(result.financialYield)}</div>
                 </div>
                 <div class="result-item">
                     <div class="label">汇率盈亏</div>
                     <div class="value ${result.exchangeProfit >= 0 ? 'positive' : 'negative'}">
                         ${result.exchangeProfit >= 0 ? '+' : ''}¥${Calculator.formatCurrency(result.exchangeProfit)}
                     </div>
-                    <div class="sub-value">收益率: ${Calculator.formatPercent(result.exchangeYield)}%</div>
+                    <div class="sub-value">收益率: ${Calculator.formatPercent(result.exchangeYield)}</div>
                 </div>
                 <div class="result-item" style="grid-column: 1 / -1;">
                     <div class="label">总盈亏</div>
                     <div class="value ${result.totalProfit >= 0 ? 'positive' : 'negative'}" style="font-size: 1.8rem;">
                         ${result.totalProfit >= 0 ? '+' : ''}¥${Calculator.formatCurrency(result.totalProfit)}
                     </div>
-                    <div class="sub-value">总收益率: ${Calculator.formatPercent(result.totalYield)}%</div>
+                    <div class="sub-value">总收益率: ${Calculator.formatPercent(result.totalYield)}</div>
                 </div>
             </div>
         `;
@@ -514,19 +514,19 @@ class App {
                     $${r.financeProfitUSD >= 0 ? '+' : ''}${Calculator.formatCurrency(r.financeProfitUSD)}
                 </td>
                 <td class="number ${r.financeROI >= 0 ? 'positive' : 'negative'}">
-                    ${Calculator.formatPercent(r.financeROI)}%
+                    ${Calculator.formatPercent(r.financeROI)}
                 </td>
                 <td class="number ${r.rateProfitCNY >= 0 ? 'positive' : 'negative'}">
                     ¥${r.rateProfitCNY >= 0 ? '+' : ''}${Calculator.formatCurrency(r.rateProfitCNY)}
                 </td>
                 <td class="number ${(r.rateProfitCNY / (r.currentHoldUSD * r.currentRate) * 100) >= 0 ? 'positive' : 'negative'}">
-                    ${r.currentHoldUSD > 0 && r.currentRate > 0 ? Calculator.formatPercent(r.rateProfitCNY / (r.currentHoldUSD * r.currentRate) * 100) + '%' : '—'}
+                    ${r.currentHoldUSD > 0 && r.currentRate > 0 ? Calculator.formatPercent(r.rateProfitCNY / (r.currentHoldUSD * r.currentRate) * 100) : '—'}
                 </td>
                 <td class="number ${r.totalProfitCNY >= 0 ? 'positive' : 'negative'}">
                     ¥${r.totalProfitCNY >= 0 ? '+' : ''}${Calculator.formatCurrency(r.totalProfitCNY)}
                 </td>
                 <td class="number ${r.totalROI >= 0 ? 'positive' : 'negative'}">
-                    ${Calculator.formatPercent(r.totalROI)}%
+                    ${Calculator.formatPercent(r.totalROI)}
                 </td>
             </tr>
         `).join('');
