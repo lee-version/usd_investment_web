@@ -1,39 +1,59 @@
 @echo off
 chcp 65001 >nul 2>nul
-title USD 收益追踪系统 - 启动中
+title USD 收益追踪系统
 
 cd /d "%~dp0"
 
-echo [检查] Node.js 环境...
+:: 检查 Node.js
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo ❌ 错误：未检测到 Node.js
-    echo 请先安装: https://nodejs.org/
-    timeout /t 5
+    echo.
+    echo   ❌ 未检测到 Node.js
+    echo   请先安装: https://nodejs.org/
+    echo.
+    pause
     exit /b 1
 )
 
+:: 安装依赖（首次）
 if not exist "node_modules" (
-    echo [安装] 首次运行，正在安装依赖...
+    echo.
+    echo   📦 首次运行，正在安装依赖...
     call npm install >nul 2>&1
 )
 
-echo [启动] 正在启动服务器...
+:: 检查端口是否被占用
+netstat -ano | findstr :3000 | findstr LISTENING >nul 2>nul
+if %errorlevel% equ 0 (
+    echo.
+    echo   ⚠️  端口 3000 已被占用
+    echo   可能服务器已在运行
+    echo   请访问: http://localhost:3000
+    echo.
+    start http://localhost:3000
+    timeout /t 3
+    exit /b 0
+)
 
-:: 使用 VBScript 隐藏窗口启动 Node.js 服务器
-echo Set WshShell = CreateObject("WScript.Shell") > "%temp%\launch_server.vbs"
-echo WshShell.Run "cmd /c cd /d ""%~dp0"" && node server.js", 0, False >> "%temp%\launch_server.vbs"
+:: 使用 PowerShell 后台启动（兼容中文路径）
+echo.
+echo   🚀 正在启动服务器...
+powershell -Command "Start-Process cmd -ArgumentList '/c cd /d \"%~dp0\" && node server.js && pause' -WindowStyle Hidden"
 
-cscript //nologo "%temp%\launch_server.vbs" >nul 2>&1
-del "%temp%\launch_server.vbs" >nul 2>&1
+:: 等待服务器启动
+echo   ⏳ 等待服务器就绪...
+timeout /t 4 /nobreak >nul
 
-echo [等待] 服务器启动中...
-timeout /t 3 /nobreak >nul
-
-echo [打开] 正在打开浏览器...
+:: 打开浏览器
+echo   🌐 打开浏览器...
 start http://localhost:3000
 
 timeout /t 1 /nobreak >nul
 
-:: 关闭自身窗口
+echo.
+echo   ✅ 启动完成！
+echo   💡 关闭此窗口不会影响服务器运行
+echo   ⚠️  如需停止服务器，请关闭任务管理器中的 node.exe 进程
+echo.
+timeout /t 5
 exit
