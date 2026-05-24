@@ -35,6 +35,9 @@ class StorageManager {
             conflictCount: 0
         };
         
+        // 用户登录时间戳（用于区分登录前后的数据）
+        this.loginTimestamp = null;
+        
         // Supabase 客户端实例
         this.supabaseClient = null;
         
@@ -191,24 +194,22 @@ class StorageManager {
                 if (session?.user) {
                     console.log(`✅ 用户已登录: ${session.user.email || session.user.id}`);
                     
-                    // 1️⃣ 先从云端下载最新数据并合并
+                    // 记录登录时间戳（用于区分登录前后的数据）
+                    if (!this.loginTimestamp) {
+                        this.loginTimestamp = new Date().toISOString();
+                        localStorage.setItem(this.STORAGE_PREFIX + 'login_timestamp', this.loginTimestamp);
+                        console.log(`🕐 登录时间已记录: ${this.loginTimestamp}`);
+                    }
+                    
+                    // 1️⃣ 从云端下载最新数据并合并
                     console.log('📥 从云端加载最新数据...');
                     await this._downloadFromCloud();
                     console.log(`✅ 云端数据已合并:`);
                     console.log(`   - 买入记录: ${this.buyRecords.length} 条`);
                     console.log(`   - 历史记录: ${this.historyRecords.length} 条`);
                     
-                    // 2️⃣ 将本地数据同步到云端（确保一致性）
-                    if (this.syncStatus.pendingChanges || this.buyRecords.length > 0 || this.historyRecords.length > 0) {
-                        console.log('📤 同步本地数据到云端...');
-                        try {
-                            await this._incrementalUploadToCloud(true);
-                            console.log('✅ 本地数据已同步到云端');
-                        } catch (error) {
-                            console.warn('⚠️ 初次同步失败，将在后台重试:', error.message);
-                            this.syncStatus.pendingChanges = true;
-                        }
-                    }
+                    // 2️⃣ 只同步登录后的新数据到云端（不包括登录前的本地数据）
+                    await this._syncNewRecordsToCloud();
                     
                     // 3️⃣ 启动定时同步（后续变更自动同步）
                     this._startPeriodicSync();
@@ -415,18 +416,16 @@ class StorageManager {
         }
         
         this.syncStatus.isSyncing = true;
-        console.log('📤 增量同步到云端...');
+        console.log('📤 增量同步到云端（仅登录后的新数据）...');
         
         try {
-            // 并行上传所有表
-            await Promise.all([
-                this._uploadBuyRecords(),
-                this._uploadHistoryRecords(),
-                this._uploadConfig()
-            ]);
+            // 只同步登录后的新数据到云端
+            await this._syncNewRecordsToCloud();
+            
+            // 上传配置
+            await this._uploadConfig();
             
             this.syncStatus.lastSync = new Date().toISOString();
-            this.syncStatus.pendingChanges = false;
             console.log('✅ 增量同步完成');
             
         } catch (error) {
@@ -437,13 +436,62 @@ class StorageManager {
     }
 
     /**
-     * 上传买入记录到云端
+     * 只同步登录后的新数据到云端（排除登录前的本地数据）
      */
-    async _uploadBuyRecords() {
-        if (!this.supabaseClient || this.buyRecords.length === 0) return;
+    async _syncNewRecordsToCloud() {
+        if (!this.supabaseClient || !this.loginTimestamp) {
+            console.log('⏭️ 跳过同步：未登录或无登录时间戳');
+            return;
+        }
+        
+        const loginTime = new Date(this.loginTimestamp).getTime();
+        
+        // 筛选登录后新增的买入记录
+        const newBuyRecords = this.buyRecords.filter(r => {
+            const recordTime = new Date(r.createdAt).getTime();
+            return recordTime >= loginTime;
+        });
+        
+        // 筛选登录后新增的历史记录
+        const newHistoryRecords = this.historyRecords.filter(r => {
+            const recordTime = new Date(r.createdAt).getTime();
+            return recordTime >= loginTime;
+        });
+        
+        if (newBuyRecords.length === 0 && newHistoryRecords.length === 0) {
+            console.log('⏭️ 没有需要同步的新数据（登录后未添加新记录）');
+            return;
+        }
+        
+        console.log(`📤 准备同步登录后的新数据:`);
+        console.log(`   - 新增买入记录: ${newBuyRecords.length} 条`);
+        console.log(`   - 新增历史记录: ${newHistoryRecords.length} 条`);
         
         try {
-            const recordsForDB = this.buyRecords.map(r => ({
+            if (newBuyRecords.length > 0) {
+                await this._uploadSpecificBuyRecords(newBuyRecords);
+            }
+            if (newHistoryRecords.length > 0) {
+                await this._uploadSpecificHistoryRecords(newHistoryRecords);
+            }
+            
+            console.log('✅ 登录后的新数据已同步到云端');
+            this.syncStatus.pendingChanges = false;
+            this.syncStatus.lastSync = new Date().toISOString();
+        } catch (error) {
+            console.warn('⚠️ 新数据同步失败:', error.message);
+            this.syncStatus.pendingChanges = true;
+        }
+    }
+
+    /**
+     * 上传指定的买入记录到云端
+     */
+    async _uploadSpecificBuyRecords(records) {
+        if (!this.supabaseClient || records.length === 0) return;
+        
+        try {
+            const recordsForDB = records.map(r => ({
                 id: r.id,
                 buy_time: r.date,
                 usd_amount: r.usdAmount,
@@ -465,13 +513,13 @@ class StorageManager {
     }
 
     /**
-     * 上传历史记录到云端
+     * 上传指定的历史记录到云端
      */
-    async _uploadHistoryRecords() {
-        if (!this.supabaseClient || this.historyRecords.length === 0) return;
+    async _uploadSpecificHistoryRecords(records) {
+        if (!this.supabaseClient || records.length === 0) return;
         
         try {
-            const recordsForDB = this.historyRecords.map(r => ({
+            const recordsForDB = records.map(r => ({
                 id: r.id,
                 query_time: r.queryTime,
                 finance_roi: r.financeROI,
