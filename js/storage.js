@@ -167,11 +167,29 @@ class StorageManager {
     /**
      * 启动自动同步（每5分钟同步一次）
      */
-    _startAutoSync() {
-        // 首次同步
-        setTimeout(() => this.syncToCloud(), 3000);
+    async _startAutoSync() {
+        console.log('🔄 启动自动同步...');
         
-        // 定时同步（5分钟）
+        // ⭐ 首次加载：从云端下载数据到本地（关键修复）
+        try {
+            await this.syncFromCloud();
+            console.log('✅ 初始数据同步完成');
+            
+            // 触发UI更新事件
+            window.dispatchEvent(new CustomEvent('dataLoaded', { 
+                detail: {
+                    buyRecordsCount: this.buyRecords.length,
+                    historyRecordsCount: this.historyRecords.length
+                }
+            }));
+        } catch (error) {
+            console.error('❌ 初始数据同步失败:', error);
+        }
+        
+        // 延迟上传（等待用户操作后）
+        setTimeout(() => this.syncToCloud(), 5000);
+        
+        // 定时同步（5分钟）- 只在有变更时上传
         setInterval(() => {
             if (this.syncStatus.pendingChanges) {
                 this.syncToCloud();
@@ -394,25 +412,58 @@ class StorageManager {
                 this.supabaseClient.from(this.TABLES.CONFIG).select('*').eq('id', 1).single()
             ]);
             
-            // 合并策略：云端优先（如果云端有更新的数据）
+            // 合并策略：如果本地为空或云端数据更多，使用云端数据
             if (buyRes.data && buyRes.data.length > 0) {
-                const cloudIds = new Set(buyRes.data.map(r => r.id));
-                const localIds = new Set(this.buyRecords.map(r => r.id));
+                // 转换数据库字段名为前端格式
+                const cloudDataFormatted = buyRes.data.map(r => ({
+                    id: r.id,
+                    date: r.buy_time,
+                    usdAmount: parseFloat(r.usd_amount),
+                    buyRate: parseFloat(r.buy_rate),
+                    costCNY: parseFloat(r.cost_cny || (r.usd_amount * r.buy_rate)),
+                    createdAt: r.created_at,
+                    updatedAt: r.updated_at
+                }));
                 
-                // 只添加本地没有的数据
-                const newFromCloud = buyRes.data.filter(r => !localIds.has(r.id));
-                if (newFromCloud.length > 0) {
-                    this.buyRecords = [...newFromCloud, ...this.buyRecords];
-                    console.log(`📥 从云端获取 ${newFromCloud.length} 条新买入记录`);
+                // 如果本地没有数据，直接使用云端数据；否则合并
+                if (this.buyRecords.length === 0) {
+                    this.buyRecords = cloudDataFormatted;
+                    console.log(`📥 从云端加载 ${cloudDataFormatted.length} 条买入记录`);
+                } else {
+                    const localIds = new Set(this.buyRecords.map(r => r.id));
+                    const newFromCloud = cloudDataFormatted.filter(r => !localIds.has(r.id));
+                    if (newFromCloud.length > 0) {
+                        this.buyRecords = [...newFromCloud, ...this.buyRecords];
+                        console.log(`📥 从云端获取 ${newFromCloud.length} 条新买入记录`);
+                    }
                 }
             }
             
             if (historyRes.data && historyRes.data.length > 0) {
-                const localIds = new Set(this.historyRecords.map(r => r.id));
-                const newFromCloud = historyRes.data.filter(r => !localIds.has(r.id));
-                if (newFromCloud.length > 0) {
-                    this.historyRecords = [...newFromCloud, ...this.historyRecords];
-                    console.log(`📥 从云端获取 ${newFromCloud.length} 条新历史记录`);
+                // 转换数据库字段名为前端格式
+                const cloudDataFormatted = historyRes.data.map(r => ({
+                    id: r.id,
+                    queryTime: r.query_time,
+                    financeROI: parseFloat(r.finance_roi),
+                    financeProfitUSD: parseFloat(r.finance_profit_usd),
+                    totalProfitCNY: parseFloat(r.total_profit_cny),
+                    totalROI: parseFloat(r.total_roi),
+                    currentRate: parseFloat(r.current_rate),
+                    rateProfitCNY: parseFloat(r.rate_profit_cny),
+                    currentHoldUSD: parseFloat(r.current_hold_usd),
+                    createdAt: r.created_at
+                }));
+                
+                if (this.historyRecords.length === 0) {
+                    this.historyRecords = cloudDataFormatted;
+                    console.log(`📥 从云端加载 ${cloudDataFormatted.length} 条历史记录`);
+                } else {
+                    const localIds = new Set(this.historyRecords.map(r => r.id));
+                    const newFromCloud = cloudDataFormatted.filter(r => !localIds.has(r.id));
+                    if (newFromCloud.length > 0) {
+                        this.historyRecords = [...newFromCloud, ...this.historyRecords];
+                        console.log(`📥 从云端获取 ${newFromCloud.length} 条新历史记录`);
+                    }
                 }
             }
             
@@ -421,19 +472,22 @@ class StorageManager {
                     new Date(configRes.data.last_update) > new Date(this.config.lastUpdate)) {
                     this.config = {
                         id: configRes.data.id,
-                        currentHoldUSD: configRes.data.current_hold_usd,
-                        currentRate: configRes.data.current_rate,
+                        currentHoldUSD: parseFloat(configRes.data.current_hold_usd),
+                        currentRate: parseFloat(configRes.data.current_rate),
                         lastUpdate: configRes.data.last_update
                     };
                     console.log('📥 从云端更新配置');
                 }
             }
             
-            // 保存合并后的数据
+            // 保存合并后的数据到 localStorage
             this._saveToLocalStorage();
+            
+            console.log(`✅ 云端同步完成 - 买入:${this.buyRecords.length}条, 历史:${this.historyRecords.length}条`);
             
         } catch (error) {
             console.error('❌ 从云端拉取失败:', error);
+            throw error;  // 向上抛出错误，让调用者知道失败
         }
     }
 
