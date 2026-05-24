@@ -99,6 +99,12 @@ class AuthManager {
                 console.log(`✅ 用户已登录: ${this.user.username}`);
                 this.notifyListeners();
                 this.updateUI();
+                
+                // 🔐 登录成功后触发云端数据同步
+                if (window.storageManager) {
+                    console.log('🔄 触发登录后云端同步...');
+                    await window.storageManager._startSmartSync(true);
+                }
             } else {
                 this.setUser(null);
             }
