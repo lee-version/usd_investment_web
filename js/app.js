@@ -419,12 +419,7 @@ class App {
         container.style.display = 'block';
 
         const saveBtn = document.getElementById('calc-save-btn');
-        if (saveBtn) {
-            saveBtn.disabled = false;
-            console.log('✅ 保存按钮已启用');
-        } else {
-            console.error('❌ 找不到保存按钮元素 #calc-save-btn');
-        }
+        if (saveBtn) saveBtn.disabled = false;
     }
 
     async saveCalculation() {
@@ -448,7 +443,15 @@ class App {
             });
             
             alert('计算结果已保存到数据表');
-            document.getElementById('calc-save-btn').disabled = true;
+            const saveBtn = document.getElementById('calc-save-btn');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.textContent = '✓ 已保存';
+                setTimeout(() => {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '保存结果';
+                }, 2000);
+            }
         } catch (error) {
             console.error('保存计算结果失败:', error);
             alert('保存失败，请检查网络连接');
