@@ -407,10 +407,10 @@ class AuthManager {
             
             authContainer.innerHTML = `
                 <div class="user-info">
-                    <img src="${this.user.avatarUrl || 'https://via.placeholder.com/32'}" 
+                    <img src="${this.user.avatarUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSIxNiIgZmlsbD0iI0U1RTVFNSIvPjxwYXRoIGQ9Ik0xNiAxNkMxOC4yMDYxIDE2IDIwIDE0LjIwNjEgMjAgMTJDMjAgOS43OTA4NiAxOC4yMDkxIDggMTYgOEMxMy43OTA5IDggMTIgOS43OTA4NiAxMiAxMkMxMiAxNC4yMDYxIDEzLjc5MDEgMTYgMTYgMTZaIiBmaWxsPSIjOUI5QjlCIi8+PC9zdmc+'}" 
                          alt="${this.user.username}" 
                          class="user-avatar"
-                         onerror="this.src='https://via.placeholder.com/32'">
+                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSIxNiIgZmlsbD0iI0U1RUVFNSIvPjxwYXRoIGQ9Ik0xNiAxNkMxOC4yMDYxIDE2IDIwIDE0LjIwNjEgMjAgMTJDMjAgOS43OTA4NiAxOC4yMDkxIDggMTYgOEMxMy43OTA5IDggMTIgOS43OTA4NiAxMiAxMkMxMiAxNC4yMDYxIDEzLjc5MDEgMTYgMTYgMTZaIiBmaWxsPSIjOUI5QjlCIi8+PC9zdmc+'">
                     <div class="user-details">
                         <div class="user-name-row">
                             <span class="user-name">${this.user.username || this.user.email}</span>
