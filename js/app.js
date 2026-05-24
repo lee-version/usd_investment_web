@@ -1,7 +1,7 @@
 /**
  * App - 主应用逻辑
- * 视图切换、表单处理、数据渲染、事件绑�?
- * 所有数据操作通过API异步完成，使�?buy_records / history_records / config 三张�?
+ * 视图切换、表单处理、数据渲染、事件绑定
+ * 所有数据操作通过API异步完成，使用 buy_records / history_records / config 三张表
  */
 class App {
     constructor() {
@@ -21,11 +21,11 @@ class App {
             await this.renderBuyRecords();
             await this.renderHistoryRecords();
         } catch (error) {
-            console.error('初始化数据加载失�?', error);
+            console.error('初始化数据加载失败', error);
             alert('连接数据库失败，请确保后端服务已启动');
         }
 
-        // 窗口大小改变时重绘图�?
+        // 窗口大小改变时重绘图表
         window.addEventListener('resize', () => {
             if (this.currentView === 'charts') {
                 clearTimeout(this._resizeTimer);
@@ -48,7 +48,7 @@ class App {
     async switchView(view) {
         this.currentView = view;
 
-        // 更新导航状�?
+        // 更新导航状态
         document.querySelectorAll('.nav-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.view === view);
         });
@@ -58,7 +58,7 @@ class App {
             s.classList.toggle('active', s.id === `view-${view}`);
         });
 
-        // 切换视图时刷新对应数�?
+        // 切换视图时刷新对应数据
         if (view === 'purchase') {
             await this.renderBuyRecords();
         } else if (view === 'calculator') {
@@ -108,7 +108,7 @@ class App {
         };
 
         if (!record.date || isNaN(record.buyRate) || isNaN(record.usdAmount)) {
-            alert('请填写完整且有效的信�?);
+            alert('请填写完整且有效的信息');
             return;
         }
 
@@ -123,7 +123,7 @@ class App {
             await this.renderBuyRecords();
         } catch (error) {
             console.error('添加买入记录失败:', error);
-            alert('添加记录失败，请检查网络连�?);
+            alert('添加记录失败，请检查网络连接');
         }
     }
 
@@ -140,7 +140,7 @@ class App {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="5" class="empty-state">
-                        <p>加载数据失败，请检查网络连�?/p>
+                        <p>加载数据失败，请检查网络连接</p>
                     </td>
                 </tr>
             `;
@@ -154,7 +154,7 @@ class App {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="5" class="empty-state">
-                        <p>暂无购买记录，请在上方添�?/p>
+                        <p>暂无购买记录，请在上方添加</p>
                     </td>
                 </tr>
             `;
@@ -197,7 +197,7 @@ class App {
         const checked = document.querySelectorAll('.purchase-checkbox:checked');
         if (checked.length === 0) return;
 
-        if (!confirm(`确定要删除选中�?${checked.length} 条记录吗？`)) return;
+        if (!confirm(`确定要删除选中的 ${checked.length} 条记录吗？`)) return;
 
         const ids = Array.from(checked).map(cb => cb.value);
         
@@ -210,7 +210,7 @@ class App {
             }
         } catch (error) {
             console.error('删除买入记录失败:', error);
-            alert('删除失败，请检查网络连�?);
+            alert('删除失败，请检查网络连接');
         }
     }
 
@@ -239,22 +239,22 @@ class App {
         const dateInput = document.getElementById('calc-date');
 
         try {
-            // �?buy_records 获取统计数据
+            // 从 buy_records 获取统计数据
             const stats = await storageManager.getBuyStats();
             
-            // 优先�?history_records 获取最新记录的当前汇率
+            // 优先从 history_records 获取最新记录的当前汇率
             let latestRateFromHistory = null;
             try {
                 const historyRecords = await storageManager.getHistoryRecords();
                 if (historyRecords && historyRecords.length > 0) {
-                    // history_records 已经是倒序（最新在前），取第一�?
+                    // history_records 已经是倒序（最新在前），取第一条
                     latestRateFromHistory = historyRecords[0].currentRate;
                 }
             } catch (e) {
                 console.log('获取历史记录失败:', e);
             }
 
-            // �?config 表获取上次保存的配置（作为备选）
+            // 从 config 表获取上次保存的配置（作为备选）
             let config = null;
             try {
                 config = await storageManager.getConfig();
@@ -263,20 +263,20 @@ class App {
             }
 
             if (avgRateEl) {
-                avgRateEl.textContent = stats.avgCostRate ? Calculator.formatRate(stats.avgCostRate) : '�?;
+                avgRateEl.textContent = stats.avgCostRate ? Calculator.formatRate(stats.avgCostRate) : '-';
             }
             if (totalHoldEl) {
-                totalHoldEl.textContent = stats.totalHoldingUSD ? `$${Calculator.formatCurrency(stats.totalHoldingUSD)}` : '�?;
+                totalHoldEl.textContent = stats.totalHoldingUSD ? `$${Calculator.formatCurrency(stats.totalHoldingUSD)}` : '-';
             }
 
-            // 自动填入配置中的值或统计�?
+            // 自动填入配置中的值或统计数据
             if (holdingInput && !holdingInput.value) {
                 holdingInput.value = config && config.currentHoldUSD > 0 
                     ? config.currentHoldUSD 
                     : (stats.totalHoldingUSD || '');
             }
             
-            // 当前汇率：优先使用历史记录的最新汇率，其次使用 config，最后为�?
+            // 当前汇率：优先使用历史记录的最新汇率，其次使用 config，最后为空
             if (rateInput && !rateInput.value) {
                 if (latestRateFromHistory && latestRateFromHistory > 0) {
                     rateInput.value = latestRateFromHistory;
@@ -291,9 +291,9 @@ class App {
                 dateInput.value = new Date().toISOString().split('T')[0];
             }
         } catch (error) {
-            console.error('更新计算器信息失�?', error);
-            if (avgRateEl) avgRateEl.textContent = '�?;
-            if (totalHoldEl) totalHoldEl.textContent = '�?;
+            console.error('更新计算器信息失败', error);
+            if (avgRateEl) avgRateEl.textContent = '-';
+            if (totalHoldEl) totalHoldEl.textContent = '-';
         }
     }
 
@@ -311,17 +311,17 @@ class App {
             stats = await storageManager.getBuyStats();
         } catch (error) {
             console.error('获取统计数据失败:', error);
-            alert('获取数据失败，请检查网络连�?);
+            alert('获取数据失败，请检查网络连接');
             return;
         }
 
         if (!calcDate || isNaN(holdingAmount) || isNaN(currentRate)) {
-            alert('请填写完整信�?);
+            alert('请填写完整信息');
             return;
         }
 
         if (!stats.avgCostRate) {
-            alert('暂无购买记录，请先添加购买记�?);
+            alert('暂无购买记录，请先添加购买记录');
             this.switchView('purchase');
             return;
         }
@@ -329,18 +329,18 @@ class App {
         try {
             // 计算各项指标（基于新的数据模型）
             const originalCost = stats.totalCostCNY; // 原始成本
-            const currentValue = holdingAmount * currentRate; // 当前价�?
+            const currentValue = holdingAmount * currentRate; // 当前价值
             
-            // 汇率盈亏 = 总持�?× 当前汇率 - 原始成本
+            // 汇率盈亏 = 总持有量 × 当前汇率 - 原始成本
             const exchangeValue = stats.totalHoldingUSD * currentRate;
             const exchangeProfit = exchangeValue - originalCost;
             const exchangeYield = originalCost > 0 ? (exchangeProfit / originalCost) * 100 : 0;
             
-            // 理财收益倒算：当前总价�?- 原始成本 - 汇率盈亏
+            // 理财收益倒算：当前总价值 - 原始成本 - 汇率盈亏
             const financialIncome = currentValue - originalCost - exchangeProfit;
             const financialYield = originalCost > 0 ? (financialIncome / originalCost) * 100 : 0;
             
-            // 总盈亏和收益�?
+            // 总盈亏和收益率
             const totalProfit = currentValue - originalCost;
             const totalYield = originalCost > 0 ? (totalProfit / originalCost) * 100 : 0;
 
@@ -363,7 +363,7 @@ class App {
             
             this.displayResult(this.lastResult);
 
-            // 同时更新 config �?
+            // 同时更新 config 表
             try {
                 await storageManager.updateConfig({
                     currentHoldUSD: holdingAmount,
@@ -389,7 +389,7 @@ class App {
                     <div class="sub-value">$${Calculator.formatCurrency(result.totalHoldingUSD)}</div>
                 </div>
                 <div class="result-item">
-                    <div class="label">当前价�?/div>
+                    <div class="label">当前价值</div>
                     <div class="value">¥${Calculator.formatCurrency(result.currentValue)}</div>
                     <div class="sub-value">$${Calculator.formatCurrency(result.holdingAmount)}</div>
                 </div>
@@ -398,17 +398,17 @@ class App {
                     <div class="value ${result.financialIncome >= 0 ? 'positive' : 'negative'}">
                         ${result.financialIncome >= 0 ? '+' : ''}¥${Calculator.formatCurrency(result.financialIncome)}
                     </div>
-                    <div class="sub-value">收益�? ${Calculator.formatPercent(result.financialYield)}</div>
+                    <div class="sub-value">收益率: ${Calculator.formatPercent(result.financialYield)}</div>
                 </div>
                 <div class="result-item">
                     <div class="label">汇率盈亏</div>
                     <div class="value ${result.exchangeProfit >= 0 ? 'positive' : 'negative'}">
                         ${result.exchangeProfit >= 0 ? '+' : ''}¥${Calculator.formatCurrency(result.exchangeProfit)}
                     </div>
-                    <div class="sub-value">收益�? ${Calculator.formatPercent(result.exchangeYield)}</div>
+                    <div class="sub-value">收益率: ${Calculator.formatPercent(result.exchangeYield)}</div>
                 </div>
                 <div class="result-item" style="grid-column: 1 / -1;">
-                    <div class="label">总盈�?/div>
+                    <div class="label">总盈亏</div>
                     <div class="value ${result.totalProfit >= 0 ? 'positive' : 'negative'}" style="font-size: 1.8rem;">
                         ${result.totalProfit >= 0 ? '+' : ''}¥${Calculator.formatCurrency(result.totalProfit)}
                     </div>
@@ -434,7 +434,7 @@ class App {
             await storageManager.addHistoryRecord({
                 queryTime: r.queryTime,
                 financeROI: r.financialYield,
-                financeProfitUSD: r.financialIncome / r.currentRate, // 转换为美元维�?
+                financeProfitUSD: r.financialIncome / r.currentRate, // 转换为美元维度
                 totalProfitCNY: r.totalProfit,
                 totalROI: r.totalYield,
                 currentRate: r.currentRate,
@@ -442,11 +442,11 @@ class App {
                 currentHoldUSD: r.holdingAmount
             });
             
-            alert('计算结果已保存到数据�?);
+            alert('计算结果已保存到数据表');
             document.getElementById('calc-save-btn').disabled = true;
         } catch (error) {
             console.error('保存计算结果失败:', error);
-            alert('保存失败，请检查网络连�?);
+            alert('保存失败，请检查网络连接');
         }
     }
 
@@ -481,7 +481,7 @@ class App {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="10" class="empty-state">
-                        <p>加载数据失败，请检查网络连�?/p>
+                        <p>加载数据失败，请检查网络连接</p>
                     </td>
                 </tr>
             `;
@@ -520,7 +520,7 @@ class App {
                     ¥${r.rateProfitCNY >= 0 ? '+' : ''}${Calculator.formatCurrency(r.rateProfitCNY)}
                 </td>
                 <td class="number ${(r.rateProfitCNY / (r.currentHoldUSD * r.currentRate) * 100) >= 0 ? 'positive' : 'negative'}">
-                    ${r.currentHoldUSD > 0 && r.currentRate > 0 ? Calculator.formatPercent(r.rateProfitCNY / (r.currentHoldUSD * r.currentRate) * 100) : '�?}
+                    ${r.currentHoldUSD > 0 && r.currentRate > 0 ? Calculator.formatPercent(r.rateProfitCNY / (r.currentHoldUSD * r.currentRate) * 100) : '-'}
                 </td>
                 <td class="number ${r.totalProfitCNY >= 0 ? 'positive' : 'negative'}">
                     ¥${r.totalProfitCNY >= 0 ? '+' : ''}${Calculator.formatCurrency(r.totalProfitCNY)}
@@ -554,20 +554,20 @@ class App {
         const checked = document.querySelectorAll('.record-checkbox:checked');
         if (checked.length === 0) return;
 
-        if (!confirm(`确定要删除选中�?${checked.length} 条记录吗？`)) return;
+        if (!confirm(`确定要删除选中的 ${checked.length} 条记录吗？`)) return;
 
         const ids = Array.from(checked).map(cb => cb.value);
         
         try {
             await storageManager.deleteHistoryRecords(ids);
             await this.renderHistoryRecords();
-            // 刷新核心指标和图�?
+            // 刷新核心指标和图表
             if (typeof charts !== 'undefined') {
                 await charts.renderCoreMetrics();
             }
         } catch (error) {
             console.error('删除历史记录失败:', error);
-            alert('删除失败，请检查网络连�?);
+            alert('删除失败，请检查网络连接');
         }
     }
 
@@ -586,28 +586,33 @@ class App {
         if (refreshBtn) {
             refreshBtn.addEventListener('click', async () => {
                 refreshBtn.disabled = true;
-                refreshBtn.textContent = '�?刷新�?..';
+                refreshBtn.textContent = '⏳ 刷新中...';
                 
                 try {
                     await charts.renderCoreMetrics();
                     await charts.refreshAll();
-                    refreshBtn.textContent = '�?已刷�?;
-                    setTimeout(() => {
-                        refreshBtn.disabled = false;
-                        refreshBtn.textContent = '🔄 刷新';
-                    }, 1500);
+                    refreshBtn.textContent = '✅ 已刷新';
                 } catch (error) {
-                    console.error('刷新数据失败:', error);
-                    alert('刷新数据失败，请检查网络连�?);
+                    console.error('从云端刷新数据失败:', error);
+                    refreshBtn.textContent = '❌ 刷新失败';
+                } finally {
                     refreshBtn.disabled = false;
-                    refreshBtn.textContent = '🔄 刷新';
                 }
             });
         }
     }
+
+    // 启动应用
+    async start() {
+        try {
+            await this.init();
+            console.log('✅ 应用初始化完成');
+        } catch (error) {
+            console.error('❌ 应用初始化失败:', error);
+            alert('刷新数据失败，请检查网络连接');
+        }
+    }
 }
 
-// 初始化应�?
-document.addEventListener('DOMContentLoaded', () => {
-    window.app = new App();
-});
+// 初始化应用
+const app = new App();
