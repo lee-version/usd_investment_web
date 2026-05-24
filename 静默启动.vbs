@@ -1,29 +1,30 @@
-' USD 收益追踪系统 - 静默启动器
-' 功能：完全隐藏窗口启动应用
+' USD Revenue Tracker - Silent Launcher
 Set WshShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-' 项目目录
-projectDir = "c:\Users\10563\PycharmProjects\自定义项目\财务"
+' Auto-detect project directory (same folder as this script)
+projectDir = fso.GetParentFolderName(WScript.ScriptFullName)
 
-' 检查 Node.js 是否可用
-nodeCheck = WshShell.Run("where node", 0, True)
+' Check if Node.js is available
+nodeCheck = WshShell.Run("cmd /c where node", 0, True)
 If nodeCheck <> 0 Then
-    MsgBox "错误：未检测到 Node.js" & vbCrLf & vbCrLf & "请先安装: https://nodejs.org/", vbCritical, "USD 收益追踪系统"
+    MsgBox "Node.js not found!" & vbCrLf & vbCrLf & "Please install: https://nodejs.org/", vbCritical, "USD Revenue Tracker"
     WScript.Quit
 End If
 
-' 检查依赖是否安装
+' Install dependencies if needed
 If Not fso.FolderExists(projectDir & "\node_modules") Then
-    ' 安装依赖（隐藏窗口）
     WshShell.Run "cmd /c cd /d """ & projectDir & """ && npm install", 0, True
 End If
 
-' 后台启动 Node.js 服务器（完全隐藏）
+' Kill existing server on port 3000 (avoid port conflict)
+WshShell.Run "cmd /c for /f ""tokens=5"" %a in ('netstat -ano ^| findstr :3000 ^| findstr LISTENING') do taskkill /F /PID %a 2>nul", 0, True
+
+' Start Node.js server in background
 WshShell.Run "cmd /c cd /d """ & projectDir & """ && node server.js", 0, False
 
-' 等待服务器启动
+' Wait for server to fully start
 WScript.Sleep 3000
 
-' 打开浏览器
-WshShell.Run "http://localhost:3000"
+' Open default browser
+WshShell.Run "cmd /c start http://localhost:3000", 0, False

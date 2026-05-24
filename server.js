@@ -2,9 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { initDB, getPool } = require('./database');
+const { supabase } = require('./supabase');
+const { authenticateUser, optionalAuth } = require('./auth');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -20,6 +22,158 @@ app.get('/', (req, res) => {
 async function startServer() {
     try {
         await initDB();
+
+        // ==================== 认证 API (Auth) ====================
+        
+        // 获取当前用户信息
+        app.get('/api/auth/user', optionalAuth, async (req, res) => {
+            try {
+                if (!req.user) {
+                    return res.json({ success: true, data: null, authenticated: false });
+                }
+
+                const { data: profile, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('supabase_uid', req.user.id)
+                    .single();
+
+                if (error) {
+                    console.error('获取用户资料失败:', error);
+                }
+
+                res.json({
+                    success: true,
+                    data: {
+                        id: req.user.id,
+                        email: req.user.email,
+                        role: profile?.role || 'user',
+                        username: profile?.username || req.user.email,
+                        avatarUrl: profile?.avatar_url || req.user.user_metadata?.avatar_url,
+                        createdAt: req.user.created_at
+                    },
+                    authenticated: true
+                });
+            } catch (error) {
+                console.error('获取用户信息失败:', error);
+                res.status(500).json({ success: false, message: '获取用户信息失败' });
+            }
+        });
+
+        // GitHub 登录（返回 OAuth URL）
+        app.get('/api/auth/github', async (req, res) => {
+            try {
+                const siteUrl = process.env.SITE_URL || `${req.protocol}://${req.get('host')}`;
+                
+                const { data, error } = await supabase.auth.signInWithOAuth({
+                    provider: 'github',
+                    options: {
+                        redirectTo: `${siteUrl}/auth/callback`
+                    }
+                });
+
+                if (error) {
+                    console.error('GitHub 登录失败:', error);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'GitHub 登录初始化失败'
+                    });
+                }
+
+                res.json({
+                    success: true,
+                    data: {
+                        url: data.url
+                    }
+                });
+            } catch (error) {
+                console.error('GitHub 登录错误:', error);
+                res.status(500).json({ success: false, message: '服务器错误' });
+            }
+        });
+
+        // 处理 OAuth 回调
+        app.get('/auth/callback', async (req, res) => {
+            try {
+                const code = req.query.code;
+                
+                if (!code) {
+                    return res.redirect('/?error=no_code');
+                }
+
+                const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+                if (error) {
+                    console.error('OAuth 回调处理失败:', error);
+                    return res.redirect('/?error=auth_failed');
+                }
+
+                // 更新用户最后登录时间
+                if (data.user) {
+                    await supabase
+                        .from('users')
+                        .update({ last_login_at: new Date().toISOString() })
+                        .eq('supabase_uid', data.user.id);
+                }
+
+                // 重定向到前端，带上 token
+                res.redirect(`/?token=${data.session.access_token}`);
+            } catch (error) {
+                console.error('回调处理错误:', error);
+                res.redirect('/?error=server_error');
+            }
+        });
+
+        // 登出
+        app.post('/api/auth/logout', authenticateUser, async (req, res) => {
+            try {
+                const { error } = await supabase.auth.signOut();
+
+                if (error) {
+                    console.error('登出失败:', error);
+                    return res.status(500).json({
+                        success: false,
+                        message: '登出失败'
+                    });
+                }
+
+                res.json({ success: true, message: '登出成功' });
+            } catch (error) {
+                console.error('登出错误:', error);
+                res.status(500).json({ success: false, message: '服务器错误' });
+            }
+        });
+
+        // 更新用户资料
+        app.put('/api/auth/profile', authenticateUser, async (req, res) => {
+            try {
+                const { displayName, bio, location } = req.body;
+                
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .upsert({
+                        user_id: (await supabase.from('users').select('id').eq('supabase_uid', req.user.id).single()).data?.id,
+                        ...(displayName && { display_name: displayName }),
+                        ...(bio && { bio }),
+                        ...(location && { location })
+                    })
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error('更新资料失败:', error);
+                    return res.status(500).json({
+                        success: false,
+                        message: '更新资料失败'
+                    });
+                }
+
+                res.json({ success: true, data });
+            } catch (error) {
+                console.error('更新资料错误:', error);
+                res.status(500).json({ success: false, message: '服务器错误' });
+            }
+        });
 
         // ==================== 买入记录 API (buy_records) ====================
         
@@ -290,6 +444,11 @@ async function startServer() {
         app.listen(PORT, () => {
             console.log(`🚀 服务器运行在 http://localhost:${PORT}`);
             console.log('\n📡 API 端点:');
+            console.log('   🔐 用户认证 (auth):');
+            console.log('      GET    /api/auth/user      - 获取当前用户信息');
+            console.log('      GET    /api/auth/github    - GitHub OAuth 登录');
+            console.log('      POST   /api/auth/logout    - 登出');
+            console.log('      PUT    /api/auth/profile   - 更新用户资料');
             console.log('   📥 买入记录 (buy_records):');
             console.log('      GET    /api/buy-records      - 获取所有买入记录');
             console.log('      POST   /api/buy-records      - 添加买入记录');

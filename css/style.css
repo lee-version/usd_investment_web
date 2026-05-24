@@ -725,3 +725,110 @@ td:first-child {
         padding: 16px;
     }
 }
+
+/* ============================================================
+   认证组件样式 (Authentication Components)
+   ============================================================ */
+
+#auth-container {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 8px var(--shadow);
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border-light);
+}
+
+.user-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-logout {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-logout:hover {
+    background: var(--negative-light);
+    color: var(--negative);
+}
+
+.btn-github-login {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    background: #24292e;
+    color: #ffffff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: 0 2px 8px rgba(36, 41, 46, 0.2);
+}
+
+.btn-github-login:hover {
+    background: #1a1e22;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(36, 41, 46, 0.3);
+}
+
+.btn-github-login:active {
+    transform: translateY(0);
+}
+
+.btn-github-login svg {
+    width: 20px;
+    height: 20px;
+}
+
+@media (max-width: 768px) {
+    #auth-container {
+        position: absolute;
+        top: 12px;
+        right: 16px;
+    }
+
+    .user-name {
+        display: none;
+    }
+
+    .btn-github-login span {
+        display: none;
+    }
+
+    .btn-github-login {
+        padding: 8px;
+    }
+}
