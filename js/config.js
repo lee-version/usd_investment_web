@@ -14,8 +14,10 @@ window.SUPABASE_URL = 'https://xekjkqwfmvdbqvujwmlt.supabase.co';
 window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhla2prcXdmbXZkYnF2dWp3bWx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MDI1NTQsImV4cCI6MjA5NTE3ODU1NH0.ZHwgFkKUKo_FJXpbQ-5U7rBgiKp8QxIoov7AojDk_cc';
 
 // 网站基础 URL（用于 OAuth 回调等）
-window.SITE_URL = window.location.origin;
+// ⚠️ 重要：必须使用固定的生产环境地址，避免登录后跳转到 localhost
+window.SITE_URL = 'https://lee-version.github.io/usd_investment_web';
 
 console.log('🔧 配置文件已加载');
 console.log(`   Site URL: ${window.SITE_URL}`);
+console.log(`   当前位置: ${window.location.origin}`);
 console.log(`   Supabase: ${window.SUPABASE_URL ? '已配置' : '未配置'}`);

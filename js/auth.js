@@ -119,10 +119,16 @@ class AuthManager {
 
             console.log('🔑 开始 GitHub 登录...');
 
+            // 使用固定的 SITE_URL，避免跳转到 localhost
+            const redirectUrl = (window.SITE_URL || 'https://lee-version.github.io/usd_investment_web') + 
+                               (window.location.pathname || '/');
+            
+            console.log(`📍 登录回调地址: ${redirectUrl}`);
+
             const { data, error } = await this.supabaseClient.auth.signInWithOAuth({
                 provider: 'github',
                 options: {
-                    redirectTo: `${window.location.origin}${window.location.pathname}`,
+                    redirectTo: redirectUrl,
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent'
