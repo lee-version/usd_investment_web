@@ -201,10 +201,8 @@ class StorageManager {
                         console.log(`🕐 登录时间已记录: ${this.loginTimestamp}`);
                     }
                     
-                    // 1️⃣ 从云端下载最新数据并合并
-                    console.log('📥 从云端加载最新数据...');
-                    await this._downloadFromCloud();
-                    console.log(`✅ 云端数据已合并:`);
+                    // 1️⃣ 保持本地数据不变（不下载云端数据）
+                    console.log('💾 使用本地缓存数据作为主数据源');
                     console.log(`   - 买入记录: ${this.buyRecords.length} 条`);
                     console.log(`   - 历史记录: ${this.historyRecords.length} 条`);
                     
