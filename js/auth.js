@@ -1,14 +1,11 @@
 /**
- * AuthManager v2.0 - 基于 Supabase Auth 的认证管理器
+ * AuthManager v3.0 - 基于 Supabase Auth 的认证管理器（支持邮箱验证）
  * 
- * 架构变更：
- * - 旧版: 前端 → Node.js 后端 → GitHub OAuth → 返回 token
- * - 新版: 前端 → Supabase Auth (客户端) → GitHub OAuth → 直接获取 session
- * 
- * 优势：
- * - 无需后端服务器
- * - 完全适配 GitHub Pages 静态部署
- * - 更安全（token 由 Supabase 管理）
+ * 功能：
+ * - GitHub OAuth 登录
+ * - 邮箱+密码注册/登录
+ * - 邮箱验证流程
+ * - 验证状态管理
  */
 
 class AuthManager {
@@ -21,7 +18,7 @@ class AuthManager {
     }
 
     async init() {
-        console.log('🔐 AuthManager 初始化...');
+        console.log('🔐 AuthManager v3.0 初始化...');
         
         try {
             await this.initSupabaseClient();
@@ -160,6 +157,162 @@ class AuthManager {
         }
     }
 
+    // ==================== 邮箱认证功能 ====================
+
+    /**
+     * 使用邮箱和密码注册
+     */
+    async signUpWithEmail(email, password) {
+        try {
+            if (!this.supabaseClient) {
+                throw new Error('Supabase 客户端未初始化');
+            }
+
+            console.log('📧 开始邮箱注册...');
+
+            const { data, error } = await this.supabaseClient.auth.signUp({
+                email: email,
+                password: password,
+                options: {
+                    emailRedirectTo: window.SITE_URL || window.location.origin
+                }
+            });
+
+            if (error) throw error;
+
+            console.log('✅ 注册成功:', data);
+
+            if (data.user && !data.session) {
+                return {
+                    success: true,
+                    needsVerification: true,
+                    message: '注册成功！验证邮件已发送到您的邮箱，请点击邮件中的链接完成验证。'
+                };
+            }
+
+            return {
+                success: true,
+                needsVerification: false,
+                message: '注册成功！'
+            };
+
+        } catch (error) {
+            console.error('❌ 邮箱注册错误:', error);
+            
+            let errorMessage = this._translateSupabaseError(error);
+            throw new Error(errorMessage);
+        }
+    }
+
+    /**
+     * 使用邮箱和密码登录
+     */
+    async signInWithEmail(email, password) {
+        try {
+            if (!this.supabaseClient) {
+                throw new Error('Supabase 客户端未初始化');
+            }
+
+            console.log('📧 开始邮箱登录...');
+
+            const { data, error } = await this.supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+
+            if (error) throw error;
+
+            if (data.user) {
+                await this.checkSession();
+                
+                const isVerified = data.user.email_confirmed_at !== null;
+                
+                if (!isVerified) {
+                    return {
+                        success: true,
+                        needsVerification: true,
+                        message: '登录成功！但您的邮箱尚未验证，部分功能可能受限。'
+                    };
+                }
+
+                return {
+                    success: true,
+                    needsVerification: false,
+                    message: '登录成功！'
+                };
+            }
+
+        } catch (error) {
+            console.error('❌ 邮箱登录错误:', error);
+            
+            let errorMessage = this._translateSupabaseError(error);
+            throw new Error(errorMessage);
+        }
+    }
+
+    /**
+     * 重新发送验证邮件
+     */
+    async resendVerificationEmail() {
+        try {
+            if (!this.supabaseClient || !this.user?.email) {
+                throw new Error('用户信息不完整');
+            }
+
+            console.log('📤 重新发送验证邮件...');
+
+            const { error } = await this.supabaseClient.auth.resend({
+                type: 'signup',
+                email: this.user.email,
+                options: {
+                    emailRedirectTo: window.SITE_URL || window.location.origin
+                }
+            });
+
+            if (error) throw error;
+
+            console.log('✅ 验证邮件已重新发送');
+            alert('验证邮件已重新发送！请检查您的收件箱（包括垃圾邮件文件夹）。');
+
+        } catch (error) {
+            console.error('❌ 发送验证邮件失败:', error);
+            alert(`发送失败: ${error.message}`);
+        }
+    }
+
+    /**
+     * 检查邮箱是否已验证
+     */
+    isEmailVerified() {
+        return this.user?.emailConfirmedAt !== null || 
+               this.user?.email_confirmed_at !== null;
+    }
+
+    /**
+     * 翻译 Supabase 错误消息为中文
+     */
+    _translateSupabaseError(error) {
+        const errorMap = {
+            'Invalid login credentials': '邮箱或密码错误',
+            'Email not confirmed': '邮箱尚未验证，请先查收验证邮件',
+            'User already registered': '该邮箱已被注册',
+            'Password should be at least 6 characters': '密码至少需要6个字符',
+            'Unable to validate email address: invalid format': '邮箱格式无效',
+            'signups disabled for new users': '注册功能已禁用',
+            'Invalid API key': 'API 密钥无效',
+            'Network request failed': '网络连接失败，请检查网络',
+            'timeout': '请求超时，请稍后重试'
+        };
+
+        for (const [key, value] of Object.entries(errorMap)) {
+            if (error.message?.includes(key)) {
+                return value;
+            }
+        }
+
+        return error.message || '未知错误';
+    }
+
     /**
      * 登出
      */
@@ -244,13 +397,27 @@ class AuthManager {
         if (!authContainer) return;
 
         if (this.isAuthenticated()) {
+            const isVerified = this.isEmailVerified();
+            const verificationBadge = isVerified 
+                ? '<span class="verification-badge verified" title="邮箱已验证">✓ 已验证</span>'
+                : `<span class="verification-badge unverified" title="邮箱未验证 - 点击重新发送验证邮件">
+                     <button onclick="event.stopPropagation(); authManager.resendVerificationEmail()" 
+                             class="btn-resend-verify">未验证</button>
+                   </span>`;
+            
             authContainer.innerHTML = `
                 <div class="user-info">
                     <img src="${this.user.avatarUrl || 'https://via.placeholder.com/32'}" 
                          alt="${this.user.username}" 
                          class="user-avatar"
                          onerror="this.src='https://via.placeholder.com/32'">
-                    <span class="user-name">${this.user.username || this.user.email}</span>
+                    <div class="user-details">
+                        <div class="user-name-row">
+                            <span class="user-name">${this.user.username || this.user.email}</span>
+                            ${this.user.email ? verificationBadge : ''}
+                        </div>
+                        ${this.user.email ? `<small class="user-email">${this.user.email}</small>` : ''}
+                    </div>
                     <button onclick="authManager.logout()" class="btn-logout" title="退出登录">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -263,13 +430,230 @@ class AuthManager {
             `;
         } else {
             authContainer.innerHTML = `
-                <button onclick="authManager.loginWithGitHub()" class="btn-github-login">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                    </svg>
-                    GitHub 登录
+                <button onclick="authManager.showLoginModal()" class="btn-login-trigger">
+                    🔐 登录 / 注册
                 </button>
             `;
+        }
+    }
+
+    /**
+     * 显示登录模态框
+     */
+    showLoginModal() {
+        const modalHtml = `
+            <div id="auth-modal" class="modal-overlay" onclick="if(event.target === this) authManager.closeModal()">
+                <div class="modal-content auth-modal-content">
+                    <button class="modal-close" onclick="authManager.closeModal()">×</button>
+                    
+                    <h2>🔐 欢迎使用 USD 投资追踪器</h2>
+                    <p class="auth-subtitle">登录后可同步数据到云端，多设备访问更便捷</p>
+                    
+                    <!-- GitHub 登录 -->
+                    <button onclick="authManager.loginWithGitHub(); authManager.closeModal();" 
+                            class="btn-github-login btn-full-width">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                        使用 GitHub 登录
+                    </button>
+
+                    <div class="divider">
+                        <span>或</span>
+                    </div>
+
+                    <!-- 邮箱登录表单 -->
+                    <form id="email-auth-form" onsubmit="return false;">
+                        <div class="tab-buttons">
+                            <button type="button" id="tab-login" class="active" 
+                                    onclick="authManager.switchAuthTab('login')">登录</button>
+                            <button type="button" id="tab-signup"
+                                    onclick="authManager.switchAuthTab('signup')">注册</button>
+                        </div>
+
+                        <!-- 登录表单 -->
+                        <div id="login-form-section" class="auth-form-section active">
+                            <div class="form-group">
+                                <label for="login-email">邮箱地址</label>
+                                <input type="email" id="login-email" required placeholder="your@email.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="login-password">密码</label>
+                                <input type="password" id="login-password" required placeholder="输入密码（至少6位）">
+                            </div>
+                            <button type="button" onclick="authManager.handleEmailLogin()" 
+                                    class="btn-primary btn-full-width">
+                                📧 邮箱登录
+                            </button>
+                        </div>
+
+                        <!-- 注册表单 -->
+                        <div id="signup-form-section" class="auth-form-section">
+                            <div class="form-group">
+                                <label for="signup-email">邮箱地址</label>
+                                <input type="email" id="signup-email" required placeholder="your@email.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="signup-password">设置密码</label>
+                                <input type="password" id="signup-password" required placeholder="至少6个字符">
+                            </div>
+                            <div class="form-group">
+                                <label for="signup-confirm-password">确认密码</label>
+                                <input type="password" id="signup-confirm-password" required placeholder="再次输入密码">
+                            </div>
+                            <button type="button" onclick="authManager.handleEmailSignup()" 
+                                    class="btn-primary btn-full-width">
+                                ✨ 创建账户
+                            </button>
+                            <p class="auth-hint">注册后需要验证邮箱才能使用完整功能</p>
+                        </div>
+                    </form>
+
+                    <div id="auth-message" class="auth-message hidden"></div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        setTimeout(() => {
+            const modal = document.getElementById('auth-modal');
+            if (modal) modal.classList.add('show');
+        }, 10);
+    }
+
+    /**
+     * 关闭登录模态框
+     */
+    closeModal() {
+        const modal = document.getElementById('auth-modal');
+        if (modal) {
+            modal.classList.remove('show');
+            setTimeout(() => modal.remove(), 300);
+        }
+    }
+
+    /**
+     * 切换登录/注册标签
+     */
+    switchAuthTab(tab) {
+        const loginSection = document.getElementById('login-form-section');
+        const signupSection = document.getElementById('signup-form-section');
+        const loginTab = document.getElementById('tab-login');
+        const signupTab = document.getElementById('tab-signup');
+
+        if (tab === 'login') {
+            loginSection.classList.add('active');
+            signupSection.classList.remove('active');
+            loginTab.classList.add('active');
+            signupTab.classList.remove('active');
+        } else {
+            signupSection.classList.add('active');
+            loginSection.classList.remove('active');
+            signupTab.classList.add('active');
+            loginTab.classList.remove('active');
+        }
+
+        this.clearAuthMessage();
+    }
+
+    /**
+     * 处理邮箱登录
+     */
+    async handleEmailLogin() {
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        if (!email || !password) {
+            this.showAuthMessage('请填写所有字段', 'error');
+            return;
+        }
+
+        try {
+            const result = await this.signInWithEmail(email, password);
+            
+            if (result.success) {
+                this.closeModal();
+                
+                if (result.needsVerification) {
+                    setTimeout(() => {
+                        alert(result.message + '\n\n是否立即重新发送验证邮件？');
+                        this.resendVerificationEmail();
+                    }, 500);
+                }
+            }
+
+        } catch (error) {
+            this.showAuthMessage(error.message, 'error');
+        }
+    }
+
+    /**
+     * 处理邮箱注册
+     */
+    async handleEmailSignup() {
+        const email = document.getElementById('signup-email').value.trim();
+        const password = document.getElementById('signup-password').value;
+        const confirmPassword = document.getElementById('signup-confirm-password').value;
+
+        if (!email || !password || !confirmPassword) {
+            this.showAuthMessage('请填写所有字段', 'error');
+            return;
+        }
+
+        if (password.length < 6) {
+            this.showAuthMessage('密码至少需要6个字符', 'error');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            this.showAuthMessage('两次输入的密码不一致', 'error');
+            return;
+        }
+
+        try {
+            const result = await this.signUpWithEmail(email, password);
+            
+            if (result.success) {
+                this.showAuthMessage(result.message, 'success');
+                
+                if (result.needsVerification) {
+                    setTimeout(() => {
+                        this.switchAuthTab('login');
+                        document.getElementById('login-email').value = email;
+                    }, 2000);
+                }
+            }
+
+        } catch (error) {
+            this.showAuthMessage(error.message, 'error');
+        }
+    }
+
+    /**
+     * 显示认证消息
+     */
+    showAuthMessage(message, type = 'info') {
+        const messageEl = document.getElementById('auth-message');
+        if (messageEl) {
+            messageEl.textContent = message;
+            messageEl.className = `auth-message ${type}`;
+            messageEl.classList.remove('hidden');
+            
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => this.clearAuthMessage(), 5000);
+            }
+        }
+    }
+
+    /**
+     * 清除认证消息
+     */
+    clearAuthMessage() {
+        const messageEl = document.getElementById('auth-message');
+        if (messageEl) {
+            messageEl.textContent = '';
+            messageEl.className = 'auth-message hidden';
         }
     }
 }
