@@ -51,9 +51,9 @@ async function migrateData() {
         
         // 迁移 history_records 表
         await migrateTable(mysqlConnection, 'history_records', `
-            SELECT 
+            SELECT
                 id,
-                DATE_FORMAT(query_time, '%Y-%m-%d %H:%i:%s') as query_time,
+                DATE_FORMAT(query_time, '%Y-%m-%d') as query_time,
                 finance_roi,
                 finance_profit_usd,
                 total_profit_cny,
@@ -61,8 +61,8 @@ async function migrateData() {
                 current_rate,
                 rate_profit_cny,
                 current_hold_usd,
-                DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at
-            FROM history_records 
+                DATE_FORMAT(created_at, '%Y-%m-%d') as created_at
+            FROM history_records
             ORDER BY id
         `);
         
@@ -146,13 +146,12 @@ function generateInsertSQL(tableName, rows) {
                 `'${row.buy_time}'`,
                 row.usd_amount,
                 row.buy_rate,
-                row.cost_cny,
                 `'${row.created_at}'`,
                 `'${row.updated_at}'`
             ];
             
             statements.push(
-                `INSERT INTO public.${tableName} (id, buy_time, usd_amount, buy_rate, cost_cny, created_at, updated_at)\n` +
+                `INSERT INTO public.${tableName} (id, buy_time, usd_amount, buy_rate, created_at, updated_at)\n` +
                 `VALUES (${values.join(', ')});\n`
             );
         });
@@ -175,12 +174,17 @@ function generateInsertSQL(tableName, rows) {
                 `INSERT INTO public.${tableName} (id, query_time, finance_roi, finance_profit_usd, total_profit_cny, total_roi, current_rate, rate_profit_cny, current_hold_usd, created_at)\n` +
                 `VALUES (${values.join(', ')});\n`
             );
-        );
+        });
     } else if (tableName === 'config') {
         if (rows.length > 0) {
             const row = rows[0];
             const lastUpdate = row.last_update ? `'${row.last_update}'` : 'NULL';
             
+            // 先删除已存在的记录（避免重复键错误）
+            statements.push(`-- 先删除已存在的配置记录`);
+            statements.push(`DELETE FROM public.${tableName} WHERE id = ${row.id};\n`);
+            
+            // 再插入新数据
             statements.push(
                 `INSERT INTO public.${tableName} (id, current_hold_usd, current_rate, last_update)\n` +
                 `VALUES (${row.id}, ${row.current_hold_usd}, ${row.current_rate}, ${lastUpdate});\n`

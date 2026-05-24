@@ -119,9 +119,8 @@ class AuthManager {
 
             console.log('🔑 开始 GitHub 登录...');
 
-            // 使用固定的 SITE_URL，避免跳转到 localhost
-            const redirectUrl = (window.SITE_URL || 'https://lee-version.github.io/usd_investment_web') + 
-                               (window.location.pathname || '/');
+            // ✅ 直接使用 SITE_URL，避免路径重复
+            const redirectUrl = window.SITE_URL || 'https://lee-version.github.io/usd_investment_web';
             
             console.log(`📍 登录回调地址: ${redirectUrl}`);
 

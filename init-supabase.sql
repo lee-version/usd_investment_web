@@ -85,8 +85,8 @@ CREATE TABLE IF NOT EXISTS public.buy_records (
     buy_rate DECIMAL(10, 4) NOT NULL,
     cost_cny DECIMAL(14, 2) GENERATED ALWAYS AS 
         (ROUND(usd_amount * buy_rate, 2)) STORED,
-    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    created_at DATE NOT NULL,
+    updated_at DATE NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_buy_records_buy_time ON public.buy_records(buy_time DESC);
@@ -99,7 +99,7 @@ COMMENT ON COLUMN public.buy_records.cost_cny IS '自动计算的人民币成本
 -- 6. 创建历史计算记录表 (history_records)
 CREATE TABLE IF NOT EXISTS public.history_records (
     id SERIAL PRIMARY KEY,
-    query_time TIMESTAMPTZ NOT NULL,
+    query_time DATE NOT NULL,
     finance_roi DECIMAL(8, 4),
     finance_profit_usd DECIMAL(12, 2),
     total_profit_cny DECIMAL(14, 2),
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS public.history_records (
     current_rate DECIMAL(10, 4),
     rate_profit_cny DECIMAL(14, 2),
     current_hold_usd DECIMAL(12, 2),
-    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    created_at DATE NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_history_records_query_time ON public.history_records(query_time DESC);
