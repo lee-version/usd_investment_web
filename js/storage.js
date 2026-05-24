@@ -201,13 +201,43 @@ class StorageManager {
                         console.log(`🕐 登录时间已记录: ${this.loginTimestamp}`);
                     }
                     
-                    // 1️⃣ 保持本地数据不变（不下载云端数据）
-                    console.log('💾 使用本地缓存数据作为主数据源');
-                    console.log(`   - 买入记录: ${this.buyRecords.length} 条`);
-                    console.log(`   - 历史记录: ${this.historyRecords.length} 条`);
+                    // 1️⃣ 检查是否有本地数据需要覆盖
+                    const hasLocalData = this.buyRecords.length > 0 || this.historyRecords.length > 0;
                     
-                    // 2️⃣ 只同步登录后的新数据到云端（不包括登录前的本地数据）
-                    await this._syncNewRecordsToCloud();
+                    let shouldDownloadFromCloud = true;
+                    
+                    if (hasLocalData) {
+                        console.log('⚠️ 检测到本地数据，需要用户确认是否使用云端数据覆盖');
+                        
+                        shouldDownloadFromCloud = await new Promise((resolve) => {
+                            const message = `检测到本地数据：\n` +
+                                `• 买入记录：${this.buyRecords.length} 条\n` +
+                                `• 计算记录：${this.historyRecords.length} 条\n\n` +
+                                `登录后将从云端下载数据，本地未登录时添加的数据将被清除。\n\n` +
+                                `是否继续？`;
+                            
+                            if (confirm(message)) {
+                                console.log('✅ 用户同意使用云端数据覆盖本地数据');
+                                resolve(true);
+                            } else {
+                                console.log('❌ 用户取消，保留本地数据');
+                                resolve(false);
+                            }
+                        });
+                    }
+                    
+                    // 2️⃣ 从云端下载最新数据（覆盖模式）
+                    if (shouldDownloadFromCloud) {
+                        console.log('📥 从云端加载最新数据...');
+                        await this._downloadFromCloud();
+                        console.log(`✅ 云端数据已覆盖:`);
+                        console.log(`   - 买入记录: ${this.buyRecords.length} 条`);
+                        console.log(`   - 历史记录: ${this.historyRecords.length} 条`);
+                        
+                        // 保存到 localStorage（更新本地缓存）
+                        this._saveToLocalStorage();
+                        console.log('💾 云端数据已保存到本地缓存');
+                    }
                     
                     // 3️⃣ 启动定时同步（后续变更自动同步）
                     this._startPeriodicSync();
@@ -271,13 +301,10 @@ class StorageManager {
     }
 
     /**
-     * 从云端下载数据（智能合并策略）
+     * 从云端下载数据（完全覆盖模式）
      * 
-     * 修复：不再简单覆盖本地数据
-     * 而是采用"最新优先"的合并策略：
-     * - 本地独有的记录 → 保留
-     * - 云端独有的记录 → 添加
-     * - 两边都有的记录 → 保留更新时间较新的
+     * 登录后使用云端数据完全覆盖本地数据
+     * 本地未登录时的数据将被清除
      */
     async _downloadFromCloud() {
         if (!this.supabaseClient) {
@@ -285,7 +312,7 @@ class StorageManager {
             return;
         }
         
-        console.log('☁️ 开始从云端下载（智能合并模式）...');
+        console.log('☁️ 开始从云端下载（覆盖模式）...');
         
         try {
             const [buyRes, historyRes, configRes] = await Promise.all([
@@ -297,7 +324,7 @@ class StorageManager {
                     .select('*').eq('id', 1).single()
             ]);
             
-            // ===== 智能合并买入记录 =====
+            // ===== 完全覆盖买入记录 =====
             if (buyRes.data?.length > 0) {
                 const cloudBuyRecords = buyRes.data.map(r => ({
                     id: r.id,
@@ -309,15 +336,14 @@ class StorageManager {
                     updatedAt: r.updated_at
                 }));
                 
-                this.buyRecords = this._mergeRecords(
-                    this.buyRecords, 
-                    cloudBuyRecords, 
-                    'updatedAt'
-                );
-                console.log(`📥 合并后买入记录: ${this.buyRecords.length} 条`);
+                this.buyRecords = cloudBuyRecords;
+                console.log(`📥 云端买入记录已加载（${this.buyRecords.length} 条）`);
+            } else {
+                this.buyRecords = [];
+                console.log('📥 云端无买入记录，本地记录已清空');
             }
             
-            // ===== 智能合并历史记录 =====
+            // ===== 完全覆盖历史记录 =====
             if (historyRes.data?.length > 0) {
                 const cloudHistoryRecords = historyRes.data.map(r => ({
                     id: r.id,
@@ -332,12 +358,11 @@ class StorageManager {
                     createdAt: r.created_at
                 }));
                 
-                this.historyRecords = this._mergeRecords(
-                    this.historyRecords, 
-                    cloudHistoryRecords, 
-                    'createdAt'
-                );
-                console.log(`📥 合并后历史记录: ${this.historyRecords.length} 条`);
+                this.historyRecords = cloudHistoryRecords;
+                console.log(`📥 云端历史记录已加载（${this.historyRecords.length} 条）`);
+            } else {
+                this.historyRecords = [];
+                console.log('📥 云端无历史记录，本地记录已清空');
             }
             
             // 下载配置（配置直接覆盖即可）
