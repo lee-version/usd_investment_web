@@ -1,121 +1,238 @@
+/**
+ * AuthManager v2.0 - 基于 Supabase Auth 的认证管理器
+ * 
+ * 架构变更：
+ * - 旧版: 前端 → Node.js 后端 → GitHub OAuth → 返回 token
+ * - 新版: 前端 → Supabase Auth (客户端) → GitHub OAuth → 直接获取 session
+ * 
+ * 优势：
+ * - 无需后端服务器
+ * - 完全适配 GitHub Pages 静态部署
+ * - 更安全（token 由 Supabase 管理）
+ */
+
 class AuthManager {
     constructor() {
         this.user = null;
-        this.token = null;
+        this.session = null;
+        this.supabaseClient = null;
         this.listeners = [];
         this.init();
     }
 
     async init() {
-        await this.checkSession();
-        this.handleCallback();
-    }
-
-    handleCallback() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
+        console.log('🔐 AuthManager 初始化...');
         
-        if (token) {
-            localStorage.setItem('auth_token', token);
-            window.history.replaceState({}, document.title, window.location.pathname);
-            this.checkSession();
-        }
-    }
-
-    async checkSession() {
         try {
-            const token = localStorage.getItem('auth_token');
-            
-            if (!token) {
-                this.setUser(null);
-                return;
-            }
-
-            const response = await fetch('/api/auth/user', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            const data = await response.json();
-
-            if (data.success && data.authenticated) {
-                this.token = token;
-                this.setUser(data.data);
-            } else {
-                this.logout();
-            }
+            await this.initSupabaseClient();
+            await this.checkSession();
+            this.handleCallback();
         } catch (error) {
-            console.error('检查会话失败:', error);
-            this.logout();
-        }
-    }
-
-    async loginWithGitHub() {
-        try {
-            const response = await fetch('/api/auth/github');
-            const data = await response.json();
-
-            if (data.success) {
-                window.location.href = data.data.url;
-            } else {
-                throw new Error(data.message || 'GitHub 登录初始化失败');
-            }
-        } catch (error) {
-            console.error('GitHub 登录错误:', error);
-            alert('登录失败: ' + error.message);
-        }
-    }
-
-    async logout() {
-        try {
-            const token = localStorage.getItem('auth_token');
-            
-            if (token) {
-                await fetch('/api/auth/logout', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('登出请求失败:', error);
-        } finally {
-            localStorage.removeItem('auth_token');
-            this.token = null;
+            console.warn('⚠️ 认证初始化失败，使用访客模式:', error.message);
             this.setUser(null);
         }
     }
 
+    /**
+     * 初始化 Supabase 客户端（用于认证）
+     */
+    async initSupabaseClient() {
+        if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+            throw new Error('Supabase 配置未找到');
+        }
+
+        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+            this.supabaseClient = window.supabase.createClient(
+                window.SUPABASE_URL,
+                window.SUPABASE_ANON_KEY,
+                {
+                    auth: {
+                        autoRefreshToken: true,
+                        persistSession: true,
+                        detectSessionInUrl: true
+                    }
+                }
+            );
+            
+            console.log('✅ Supabase Auth 客户端初始化成功');
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 处理 OAuth 回调
+     */
+    handleCallback() {
+        // Supabase 会自动处理 URL 中的 hash fragment (#access_token=...)
+        // 我们只需要检查 session 即可
+    }
+
+    /**
+     * 检查当前会话状态
+     */
+    async checkSession() {
+        try {
+            if (!this.supabaseClient) {
+                this.setUser(null);
+                return;
+            }
+
+            const { data: { session }, error } = await this.supabaseClient.auth.getSession();
+            
+            if (error) throw error;
+            
+            if (session) {
+                this.session = session;
+                this.user = {
+                    id: session.user.id,
+                    email: session.user.email,
+                    username: session.user.user_metadata?.user_name || 
+                             session.user.user_metadata?.full_name ||
+                             session.user.email?.split('@')[0] || '用户',
+                    avatarUrl: session.user.user_metadata?.avatar_url ||
+                              session.user.user_metadata?.picture,
+                    provider: session.app_metadata?.provider
+                };
+                
+                console.log(`✅ 用户已登录: ${this.user.username}`);
+                this.notifyListeners();
+                this.updateUI();
+            } else {
+                this.setUser(null);
+            }
+        } catch (error) {
+            console.error('❌ 检查会话失败:', error);
+            this.setUser(null);
+        }
+    }
+
+    /**
+     * 使用 GitHub 登录
+     */
+    async loginWithGitHub() {
+        try {
+            if (!this.supabaseClient) {
+                throw new Error('Supabase 客户端未初始化');
+            }
+
+            console.log('🔑 开始 GitHub 登录...');
+
+            const { data, error } = await this.supabaseClient.auth.signInWithOAuth({
+                provider: 'github',
+                options: {
+                    redirectTo: `${window.location.origin}${window.location.pathname}`,
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent'
+                    }
+                }
+            });
+
+            if (error) throw error;
+
+            // 重定向到 GitHub 授权页面
+            if (data.url) {
+                console.log('🔄 重定向到 GitHub 授权...');
+                window.location.href = data.url;
+            }
+
+        } catch (error) {
+            console.error('❌ GitHub 登录错误:', error);
+            
+            let errorMessage = '登录失败';
+            
+            if (error.message?.includes('Supabase')) {
+                errorMessage = 'Supabase 服务不可用，请稍后重试';
+            } else if (error.message?.includes('provider')) {
+                errorMessage = 'GitHub 登录未配置，请联系管理员';
+            } else {
+                errorMessage = error.message || '未知错误';
+            }
+            
+            alert(`登录失败: ${errorMessage}\n\n提示：即使不登录，你也可以正常使用所有功能！数据将保存在浏览器本地。`);
+        }
+    }
+
+    /**
+     * 登出
+     */
+    async logout() {
+        try {
+            if (this.supabaseClient) {
+                const { error } = await this.supabaseClient.auth.signOut();
+                if (error) throw error;
+            }
+        } catch (error) {
+            console.error('⚠️ 登出请求失败:', error);
+        } finally {
+            this.session = null;
+            this.setUser(null);
+            console.log('👋 已登出');
+        }
+    }
+
+    /**
+     * 设置用户信息并通知监听器
+     */
     setUser(user) {
         this.user = user;
+        if (!user) this.session = null;
         this.notifyListeners();
         this.updateUI();
     }
 
+    /**
+     * 获取认证头（用于 API 请求）
+     */
     getAuthHeaders() {
-        const token = localStorage.getItem('auth_token') || this.token;
-        return token ? { 'Authorization': `Bearer ${token}` } : {};
+        if (this.session?.access_token) {
+            return {
+                'Authorization': `Bearer ${this.session.access_token}`,
+                'Content-Type': 'application/json'
+            };
+        }
+        return { 'Content-Type': 'application/json' };
     }
 
+    /**
+     * 检查是否已认证
+     */
     isAuthenticated() {
-        return !!this.user && !!this.token;
+        return !!this.user && !!this.session;
     }
 
+    /**
+     * 添加状态变化监听器
+     */
     addListener(callback) {
         this.listeners.push(callback);
     }
 
+    /**
+     * 移除监听器
+     */
     removeListener(callback) {
         this.listeners = this.listeners.filter(l => l !== callback);
     }
 
+    /**
+     * 通知所有监听器
+     */
     notifyListeners() {
-        this.listeners.forEach(callback => callback(this.user));
+        this.listeners.forEach(callback => {
+            try {
+                callback(this.user);
+            } catch (e) {
+                console.error('监听器执行错误:', e);
+            }
+        });
     }
 
+    /**
+     * 更新 UI 显示
+     */
     updateUI() {
         const authContainer = document.getElementById('auth-container');
         
@@ -152,4 +269,8 @@ class AuthManager {
     }
 }
 
+// 全局实例
 const authManager = new AuthManager();
+
+// 导出到全局作用域
+window.authManager = authManager;
