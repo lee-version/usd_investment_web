@@ -225,8 +225,13 @@ class StorageManager {
     }
 
     /**
-     * 首次使用：从云端下载数据
-     * 只在 localStorage 完全为空时调用
+     * 从云端下载数据（智能合并策略）
+     * 
+     * 修复：不再简单覆盖本地数据
+     * 而是采用"最新优先"的合并策略：
+     * - 本地独有的记录 → 保留
+     * - 云端独有的记录 → 添加
+     * - 两边都有的记录 → 保留更新时间较新的
      */
     async _downloadFromCloud() {
         if (!this.supabaseClient) {
@@ -234,7 +239,7 @@ class StorageManager {
             return;
         }
         
-        console.log('☁️ 开始从云端下载...');
+        console.log('☁️ 开始从云端下载（智能合并模式）...');
         
         try {
             const [buyRes, historyRes, configRes] = await Promise.all([
@@ -246,9 +251,9 @@ class StorageManager {
                     .select('*').eq('id', 1).single()
             ]);
             
-            // 下载买入记录
+            // ===== 智能合并买入记录 =====
             if (buyRes.data?.length > 0) {
-                this.buyRecords = buyRes.data.map(r => ({
+                const cloudBuyRecords = buyRes.data.map(r => ({
                     id: r.id,
                     date: r.buy_time,
                     usdAmount: parseFloat(r.usd_amount),
@@ -257,12 +262,18 @@ class StorageManager {
                     createdAt: r.created_at,
                     updatedAt: r.updated_at
                 }));
-                console.log(`📥 下载 ${this.buyRecords.length} 条买入记录`);
+                
+                this.buyRecords = this._mergeRecords(
+                    this.buyRecords, 
+                    cloudBuyRecords, 
+                    'updatedAt'
+                );
+                console.log(`📥 合并后买入记录: ${this.buyRecords.length} 条`);
             }
             
-            // 下载历史记录
+            // ===== 智能合并历史记录 =====
             if (historyRes.data?.length > 0) {
-                this.historyRecords = historyRes.data.map(r => ({
+                const cloudHistoryRecords = historyRes.data.map(r => ({
                     id: r.id,
                     queryTime: r.query_time,
                     financeROI: parseFloat(r.finance_roi),
@@ -274,10 +285,16 @@ class StorageManager {
                     currentHoldUSD: parseFloat(r.current_hold_usd),
                     createdAt: r.created_at
                 }));
-                console.log(`📥 下载 ${this.historyRecords.length} 条历史记录`);
+                
+                this.historyRecords = this._mergeRecords(
+                    this.historyRecords, 
+                    cloudHistoryRecords, 
+                    'createdAt'
+                );
+                console.log(`📥 合并后历史记录: ${this.historyRecords.length} 条`);
             }
             
-            // 下载配置
+            // 下载配置（配置直接覆盖即可）
             if (configRes.data) {
                 this.config = {
                     id: configRes.data.id,
@@ -291,12 +308,50 @@ class StorageManager {
             // 保存到 localStorage
             this._saveToLocalStorage();
             
-            console.log('✅ 云端数据下载完成');
+            console.log('✅ 云端数据智能合并完成');
             
         } catch (error) {
-            console.error('❌ 下载失败:', error);
+            console.error('❌ 下载/合并失败:', error);
             throw error;
         }
+    }
+
+    /**
+     * 智能合并两条记录列表
+     * @param {Array} localRecords - 本地记录
+     * @param {Array} cloudRecords - 云端记录  
+     * @param {string} timeField - 用于比较更新时间的字段名
+     * @returns {Array} 合并后的记录列表
+     */
+    _mergeRecords(localRecords, cloudRecords, timeField = 'createdAt') {
+        const mergedMap = new Map();
+        
+        // 先添加所有云端记录
+        cloudRecords.forEach(record => {
+            mergedMap.set(record.id, record);
+        });
+        
+        // 再用本地记录覆盖（如果本地更新的话）
+        localRecords.forEach(localRecord => {
+            const cloudRecord = mergedMap.get(localRecord.id);
+            
+            if (!cloudRecord) {
+                // 本地独有的记录，添加到结果中
+                mergedMap.set(localRecord.id, localRecord);
+            } else {
+                // 两边都有，比较时间戳，保留更新的
+                const localTime = new Date(localRecord[timeField] || localRecord.createdAt).getTime();
+                const cloudTime = new Date(cloudRecord[timeField] || cloudRecord.createdAt).getTime();
+                
+                if (localTime >= cloudTime) {
+                    mergedMap.set(localRecord.id, localRecord);
+                } else {
+                    mergedMap.set(cloudRecord.id, cloudRecord);
+                }
+            }
+        });
+        
+        return Array.from(mergedMap.values());
     }
 
     /**
@@ -444,6 +499,17 @@ class StorageManager {
         this.syncStatus.pendingChanges = true;
         
         console.log('✅ 添加买入记录:', newRecord);
+        
+        // 立即同步到云端（防止刷新丢失）
+        if (this.supabaseClient) {
+            try {
+                await this._incrementalUploadToCloud(true);
+                console.log('📤 买入记录已立即同步到云端');
+            } catch (error) {
+                console.warn('⚠️ 立即同步失败，将在后台重试:', error.message);
+            }
+        }
+        
         return newRecord;
     }
 
@@ -507,6 +573,17 @@ class StorageManager {
         this.syncStatus.pendingChanges = true;
         
         console.log('✅ 添加历史记录:', newRecord);
+        
+        // 立即同步到云端（防止刷新丢失）
+        if (this.supabaseClient) {
+            try {
+                await this._incrementalUploadToCloud(true);
+                console.log('📤 历史记录已立即同步到云端');
+            } catch (error) {
+                console.warn('⚠️ 立即同步失败，将在后台重试:', error.message);
+            }
+        }
+        
         return newRecord;
     }
 
@@ -514,7 +591,9 @@ class StorageManager {
      * 获取所有历史记录
      */
     getHistoryRecords() {
-        return [...this.historyRecords];
+        return [...this.historyRecords].sort((a, b) => 
+            new Date(b.queryTime) - new Date(a.queryTime)
+        );
     }
 
     /**
