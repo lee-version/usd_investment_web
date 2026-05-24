@@ -226,13 +226,30 @@ class StorageManager {
      * @returns {Promise<boolean>} 是否已登录
      */
     async _isUserLoggedIn() {
-        if (!this.supabaseClient) return false;
+        if (!this.supabaseClient) {
+            console.log('   🔍 _isUserLoggedIn: Supabase客户端不存在');
+            return false;
+        }
         
         try {
-            const { data: { session } } = await this.supabaseClient.auth.getSession();
-            return !!session?.user;
+            const { data: { session }, error } = await this.supabaseClient.auth.getSession();
+            
+            if (error) {
+                console.warn('   🔍 _isUserLoggedIn: 获取session失败:', error.message);
+                return false;
+            }
+            
+            const isLoggedIn = !!session?.user;
+            
+            if (isLoggedIn) {
+                console.log(`   🔍 _isUserLoggedIn: ✅ 已登录 (${session.user.email || session.user.id})`);
+            } else {
+                console.log('   🔍 _isUserLoggedIn: ❌ 未登录');
+            }
+            
+            return isLoggedIn;
         } catch (error) {
-            console.warn('检查登录状态失败:', error.message);
+            console.error('   🔍 _isUserLoggedIn: 检查异常:', error.message);
             return false;
         }
     }
@@ -254,6 +271,42 @@ class StorageManager {
                 this._incrementalUploadToCloud(true);
             }
         });
+    }
+
+    /**
+     * 立即尝试同步到云端（异步非阻塞）
+     * @param {string} source - 触发来源 ('buy' | 'history')
+     */
+    async _syncImmediately(source) {
+        console.log(`🔄 [${source}] 开始检查同步条件...`);
+        
+        if (!this.supabaseClient) {
+            console.log(`⚠️ [${source}] Supabase客户端未初始化，跳过同步`);
+            return;
+        }
+        
+        try {
+            const isLoggedIn = await this._isUserLoggedIn();
+            
+            if (!isLoggedIn) {
+                console.log(`⚠️ [${source}] 用户未登录，数据仅保存在本地`);
+                console.log(`   💡 提示：登录后数据将自动同步到云端`);
+                return;
+            }
+            
+            console.log(`✅ [${source}] 用户已登录，开始同步...`);
+            
+            await this._incrementalUploadToCloud(true);
+            
+            console.log(`✅ [${source}] ${source === 'buy' ? '买入记录' : '历史记录'}已成功同步到云端`);
+            
+        } catch (error) {
+            console.error(`❌ [${source}] 同步失败:`, error.message);
+            console.log(`   📌 数据已保存在本地，将在后台重试同步`);
+            
+            // 标记为待重试
+            this.syncStatus.pendingChanges = true;
+        }
     }
 
     /**
@@ -532,15 +585,8 @@ class StorageManager {
         
         console.log('✅ 添加买入记录:', newRecord);
         
-        // 立即同步到云端（仅已登录用户）
-        if (this.supabaseClient && await this._isUserLoggedIn()) {
-            try {
-                await this._incrementalUploadToCloud(true);
-                console.log('📤 买入记录已立即同步到云端');
-            } catch (error) {
-                console.warn('⚠️ 立即同步失败，将在后台重试:', error.message);
-            }
-        }
+        // 立即尝试同步到云端（不阻塞主流程）
+        this._syncImmediately('buy');
         
         return newRecord;
     }
@@ -606,15 +652,8 @@ class StorageManager {
         
         console.log('✅ 添加历史记录:', newRecord);
         
-        // 立即同步到云端（仅已登录用户）
-        if (this.supabaseClient && await this._isUserLoggedIn()) {
-            try {
-                await this._incrementalUploadToCloud(true);
-                console.log('📤 历史记录已立即同步到云端');
-            } catch (error) {
-                console.warn('⚠️ 立即同步失败，将在后台重试:', error.message);
-            }
-        }
+        // 立即尝试同步到云端（不阻塞主流程）
+        this._syncImmediately('history');
         
         return newRecord;
     }

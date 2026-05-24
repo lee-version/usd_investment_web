@@ -419,7 +419,12 @@ class App {
         container.style.display = 'block';
 
         const saveBtn = document.getElementById('calc-save-btn');
-        if (saveBtn) saveBtn.disabled = false;
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            console.log('✅ 保存按钮已启用');
+        } else {
+            console.error('❌ 找不到保存按钮元素 #calc-save-btn');
+        }
     }
 
     async saveCalculation() {
