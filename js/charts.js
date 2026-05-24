@@ -446,8 +446,8 @@ class Charts {
 
         try {
             const [historyRecords, config] = await Promise.all([
-                storage.getHistoryRecords(),
-                storage.getConfig()
+                storageManager.getHistoryRecords(),
+                storageManager.getConfig()
             ]);
 
             // 计算核心指标
@@ -548,8 +548,8 @@ class Charts {
     async refreshAll() {
         try {
             const [buyRecords, historyRecords] = await Promise.all([
-                storage.getBuyRecords(),
-                storage.getHistoryRecords()
+                storageManager.getBuyRecords(),
+                storageManager.getHistoryRecords()
             ]);
 
             // 渲染核心指标
