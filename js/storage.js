@@ -1,15 +1,14 @@
 /**
- * StorageManager v3.0 - 智能混合存储架构
+ * StorageManager v3.1 - 云端优先混合存储架构
  * 
  * ✅ 核心设计原则：
- * - localStorage = 主存储（用户的真实数据源）
- * - Supabase PostgreSQL = 云备份（只用于备份和恢复）
+ * - Supabase PostgreSQL = 主数据源（云端数据库）
+ * - localStorage = 本地缓存（离线时使用）
  * 
- * 🔄 同步策略：
- * 1. 首次使用（localStorage 为空）→ 从云端下载初始数据
- * 2. 后续使用（localStorage 有数据）→ 以本地为准，跳过下载
- * 3. 增量上传 → 只将本地新增/修改的数据上传到云端
- * 4. 绝不用云端数据覆盖 localStorage！
+ * 🔄 同步策略（云端优先）：
+ * 1. 登录后 → 从云端下载最新数据 → 覆盖本地缓存
+ * 2. 本地新增/修改 → 上传到云端备份
+ * 3. 离线模式 → 使用 localStorage 缓存数据
  */
 
 class StorageManager {
@@ -35,9 +34,6 @@ class StorageManager {
             pendingChanges: false,
             conflictCount: 0
         };
-        
-        // 同步初始化标志（防止重复触发）
-        this._syncInitialized = false;
         
         // Supabase 客户端实例
         this.supabaseClient = null;
@@ -178,45 +174,25 @@ class StorageManager {
     }
 
     /**
-     * 启动智能同步
+     * 启动智能同步（云端优先策略）
      * 
      * 核心逻辑：
-     * - 首次使用（本地为空）→ 从云端下载
-     * - 登录后 → 强制从云端同步（合并策略）
-     * - 后续使用（本地有数据）→ 以本地为准，只做增量上传
+     * - 登录后 → 从云端下载最新数据 → 覆盖 localStorage
+     * - 本地新增/修改 → 上传到云端备份
      */
-    async _startSmartSync(isAfterLogin = false) {
-        // 防止重复初始化
-        if (this._syncInitialized) {
-            console.log('⏭️ 同步已初始化，跳过重复触发');
-            return;
-        }
-        
-        this._syncInitialized = true;
-        
-        console.log('🔄 启动智能同步...');
-        console.log(`   是否登录后触发: ${isAfterLogin}`);
-        console.log(`   Supabase 连接状态: ${this.supabaseClient ? '✅ 已连接' : '❌ 未连接'}`);
+    async _startSmartSync() {
+        console.log('🔄 启动云端同步...');
         
         try {
-            // 检查是否首次使用
-            const isFirstTimeUse = this.buyRecords.length === 0 && 
-                                   this.historyRecords.length === 0;
-            
-            if (isFirstTimeUse) {
-                // ⭐ 首次使用：从云端下载初始数据
-                console.log('📥 首次使用：从云端加载初始数据...');
+            // ⭐ 每次登录都从云端下载最新数据（云端优先）
+            if (this.supabaseClient) {
+                console.log('📥 从云端加载最新数据...');
                 await this._downloadFromCloud();
-            } else if (isAfterLogin && this.supabaseClient) {
-                // 🔐 登录后：强制从云端同步（合并策略）
-                console.log('🔐 登录后：从云端同步数据（合并模式）...');
-                await this._syncFromCloudWithMerge();
-            } else {
-                // ✅ 后续使用：以 localStorage 为主
-                console.log(`✅ 使用本地数据为主:`);
+                console.log(`✅ 云端数据已加载:`);
                 console.log(`   - 买入记录: ${this.buyRecords.length} 条`);
                 console.log(`   - 历史记录: ${this.historyRecords.length} 条`);
-                console.log('   - 跳过云端下载，保持本地数据不变');
+            } else {
+                console.log('⚠️ 未连接到云端，使用本地数据');
             }
             
             // 触发 UI 更新事件
@@ -224,19 +200,16 @@ class StorageManager {
                 detail: {
                     buyRecordsCount: this.buyRecords.length,
                     historyRecordsCount: this.historyRecords.length,
-                    dataSource: isFirstTimeUse ? 'cloud' : (isAfterLogin ? 'merged' : 'local')
+                    dataSource: this.supabaseClient ? 'cloud' : 'local'
                 }
             }));
             
         } catch (error) {
-            console.error('❌ 初始同步失败:', error);
-            console.log('⚠️ 将继续使用本地模式');
+            console.error('❌ 云端同步失败:', error);
+            console.log('⚠️ 使用本地缓存数据');
         }
         
-        // 延迟执行增量上传（5秒后）
-        setTimeout(() => this._incrementalUploadToCloud(), 5000);
-        
-        // 定时增量同步（每5分钟）
+        // 定时上传本地变更到云端（每5分钟）
         setInterval(() => {
             if (this.syncStatus.pendingChanges) {
                 this._incrementalUploadToCloud();
@@ -249,121 +222,6 @@ class StorageManager {
                 this._incrementalUploadToCloud(true);
             }
         });
-    }
-
-    /**
-     * 登录后从云端同步数据（合并策略）
-     * 
-     * 合并规则：
-     * - 云端有但本地没有的 → 添加到本地
-     * - 云端和本地都有的 → 保留较新的版本
-     * - 本地有但云端没有的 → 保留本地（稍后会上传到云端）
-     */
-    async _syncFromCloudWithMerge() {
-        if (!this.supabaseClient) {
-            console.warn('⚠️ Supabase 未连接');
-            return;
-        }
-        
-        console.log('☁️ 开始从云端同步（合并模式）...');
-        
-        try {
-            const [buyRes, historyRes, configRes] = await Promise.all([
-                this.supabaseClient.from(this.TABLES.BUY_RECORDS)
-                    .select('*').order('id', { ascending: true }),
-                this.supabaseClient.from(this.TABLES.HISTORY_RECORDS)
-                    .select('*').order('id', { ascending: true }),
-                this.supabaseClient.from(this.TABLES.CONFIG)
-                    .select('*').eq('id', 1).single()
-            ]);
-            
-            let buyAdded = 0, historyAdded = 0;
-            
-            // 合并买入记录
-            if (buyRes.data?.length > 0) {
-                const localIds = new Set(this.buyRecords.map(r => r.id));
-                
-                buyRes.data.forEach(cloudRecord => {
-                    if (!localIds.has(cloudRecord.id)) {
-                        // 云端有但本地没有 → 添加
-                        const formattedRecord = {
-                            id: cloudRecord.id,
-                            date: cloudRecord.buy_time,
-                            usdAmount: parseFloat(cloudRecord.usd_amount),
-                            buyRate: parseFloat(cloudRecord.buy_rate),
-                            costCNY: parseFloat(cloudRecord.cost_cny || (cloudRecord.usd_amount * cloudRecord.buy_rate)),
-                            createdAt: cloudRecord.created_at,
-                            updatedAt: cloudRecord.updated_at
-                        };
-                        this.buyRecords.push(formattedRecord);
-                        buyAdded++;
-                    } else {
-                        // 都有 → 更新为较新的版本（以 updated_at 为准）
-                        const localRecord = this.buyRecords.find(r => r.id === cloudRecord.id);
-                        if (localRecord && cloudRecord.updated_at > localRecord.updatedAt) {
-                            Object.assign(localRecord, {
-                                date: cloudRecord.buy_time,
-                                usdAmount: parseFloat(cloudRecord.usd_amount),
-                                buyRate: parseFloat(cloudRecord.buy_rate),
-                                costCNY: parseFloat(cloudRecord.cost_cny || (cloudRecord.usd_amount * cloudRecord.buy_rate)),
-                                updatedAt: cloudRecord.updated_at
-                            });
-                        }
-                    }
-                });
-                
-                console.log(`📥 买入记录: 本地${this.buyRecords.length}条, 新增${buyAdded}条`);
-            }
-            
-            // 合并历史记录
-            if (historyRes.data?.length > 0) {
-                const localIds = new Set(this.historyRecords.map(r => r.id));
-                
-                historyRes.data.forEach(cloudRecord => {
-                    if (!localIds.has(cloudRecord.id)) {
-                        const formattedRecord = {
-                            id: cloudRecord.id,
-                            queryTime: cloudRecord.query_time,
-                            financeROI: parseFloat(cloudRecord.finance_roi),
-                            financeProfitUSD: parseFloat(cloudRecord.finance_profit_usd),
-                            totalProfitCNY: parseFloat(cloudRecord.total_profit_cny),
-                            totalROI: parseFloat(cloudRecord.total_roi),
-                            currentRate: parseFloat(cloudRecord.current_rate),
-                            rateProfitCNY: parseFloat(cloudRecord.rate_profit_cny),
-                            currentHoldUSD: parseFloat(cloudRecord.current_hold_usd),
-                            createdAt: cloudRecord.created_at
-                        };
-                        this.historyRecords.push(formattedRecord);
-                        historyAdded++;
-                    }
-                });
-                
-                console.log(`📥 历史记录: 本地${this.historyRecords.length}条, 新增${historyAdded}条`);
-            }
-            
-            // 更新配置（如果云端更新）
-            if (configRes.data && (!this.config.lastUpdate || 
-                new Date(configRes.data.last_update) > new Date(this.config.lastUpdate))) {
-                this.config = {
-                    id: configRes.data.id,
-                    currentHoldUSD: parseFloat(configRes.data.current_hold_usd),
-                    currentRate: parseFloat(configRes.data.current_rate),
-                    lastUpdate: configRes.data.last_update
-                };
-                console.log('📥 配置已从云端更新');
-            }
-            
-            // 保存合并后的数据
-            this._saveToLocalStorage();
-            
-            console.log(`✅ 云端同步完成:`);
-            console.log(`   - 买入记录: ${this.buyRecords.length} 条`);
-            console.log(`   - 历史记录: ${this.historyRecords.length} 条`);
-            
-        } catch (error) {
-            console.error('❌ 云端同步失败:', error);
-            throw error;
-        }
     }
 
     /**
