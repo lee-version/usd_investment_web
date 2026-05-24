@@ -184,13 +184,24 @@ class StorageManager {
         console.log('🔄 启动云端同步...');
         
         try {
-            // ⭐ 每次登录都从云端下载最新数据（云端优先）
+            // ⭐ 检查用户是否已登录
             if (this.supabaseClient) {
-                console.log('📥 从云端加载最新数据...');
-                await this._downloadFromCloud();
-                console.log(`✅ 云端数据已加载:`);
-                console.log(`   - 买入记录: ${this.buyRecords.length} 条`);
-                console.log(`   - 历史记录: ${this.historyRecords.length} 条`);
+                const { data: { session } } = await this.supabaseClient.auth.getSession();
+                
+                if (session?.user) {
+                    console.log(`✅ 用户已登录: ${session.user.email || session.user.id}`);
+                    console.log('📥 从云端加载最新数据...');
+                    await this._downloadFromCloud();
+                    console.log(`✅ 云端数据已加载:`);
+                    console.log(`   - 买入记录: ${this.buyRecords.length} 条`);
+                    console.log(`   - 历史记录: ${this.historyRecords.length} 条`);
+                    
+                    // 已登录用户：启动定时同步
+                    this._startPeriodicSync();
+                } else {
+                    console.log('⚠️ 用户未登录 - 仅使用本地缓存数据');
+                    console.log('💡 登录后可启用云同步功能');
+                }
             } else {
                 console.log('⚠️ 未连接到云端，使用本地数据');
             }
@@ -208,7 +219,28 @@ class StorageManager {
             console.error('❌ 云端同步失败:', error);
             console.log('⚠️ 使用本地缓存数据');
         }
+    }
+
+    /**
+     * 检查用户是否已登录
+     * @returns {Promise<boolean>} 是否已登录
+     */
+    async _isUserLoggedIn() {
+        if (!this.supabaseClient) return false;
         
+        try {
+            const { data: { session } } = await this.supabaseClient.auth.getSession();
+            return !!session?.user;
+        } catch (error) {
+            console.warn('检查登录状态失败:', error.message);
+            return false;
+        }
+    }
+
+    /**
+     * 启动定时同步（仅已登录用户）
+     */
+    _startPeriodicSync() {
         // 定时上传本地变更到云端（每5分钟）
         setInterval(() => {
             if (this.syncStatus.pendingChanges) {
@@ -500,8 +532,8 @@ class StorageManager {
         
         console.log('✅ 添加买入记录:', newRecord);
         
-        // 立即同步到云端（防止刷新丢失）
-        if (this.supabaseClient) {
+        // 立即同步到云端（仅已登录用户）
+        if (this.supabaseClient && await this._isUserLoggedIn()) {
             try {
                 await this._incrementalUploadToCloud(true);
                 console.log('📤 买入记录已立即同步到云端');
@@ -574,8 +606,8 @@ class StorageManager {
         
         console.log('✅ 添加历史记录:', newRecord);
         
-        // 立即同步到云端（防止刷新丢失）
-        if (this.supabaseClient) {
+        // 立即同步到云端（仅已登录用户）
+        if (this.supabaseClient && await this._isUserLoggedIn()) {
             try {
                 await this._incrementalUploadToCloud(true);
                 console.log('📤 历史记录已立即同步到云端');
