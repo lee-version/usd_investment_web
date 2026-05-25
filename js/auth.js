@@ -98,6 +98,11 @@ class AuthManager {
                 console.log(`✅ 用户已登录: ${this.user.username}`);
                 this.notifyListeners();
                 this.updateUI();
+                
+                // 通知 StorageManager 从云端拉取数据
+                if (window.storageManager?.onUserLogin) {
+                    window.storageManager.onUserLogin(this.user.id);
+                }
             } else {
                 this.setUser(null);
             }
@@ -371,6 +376,12 @@ class AuthManager {
     setUser(user) {
         this.user = user;
         if (!user) this.session = null;
+        
+        // 通知 StorageManager 登出
+        if (!user && window.storageManager?.onUserLogout) {
+            window.storageManager.onUserLogout();
+        }
+        
         this.notifyListeners();
         this.updateUI();
     }

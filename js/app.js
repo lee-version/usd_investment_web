@@ -442,7 +442,7 @@ class App {
                 currentHoldUSD: r.holdingAmount
             });
             
-            alert('✅ 计算结果已保存到数据表（本地 + 云端）');
+            alert('✅ 计算结果已保存');
             
             const saveBtn = document.getElementById('calc-save-btn');
             if (saveBtn) {
@@ -455,12 +455,7 @@ class App {
             }
         } catch (error) {
             console.error('❌ 保存计算结果失败:', error);
-            
-            if (error.message.includes('云端同步失败')) {
-                alert(`⚠️ ${error.message}\n\n💡 提示：\n1. 请确认已登录账户\n2. 检查浏览器控制台（F12）查看详细日志\n3. 数据已保存在本地，可正常使用`);
-            } else {
-                alert(`❌ 保存失败: ${error.message}\n\n请检查网络连接或联系技术支持`);
-            }
+            alert(`❌ 保存失败: ${error.message}`);
         }
     }
 
