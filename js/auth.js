@@ -475,8 +475,12 @@ class AuthManager {
             `;
         } else {
             authContainer.innerHTML = `
-                <button onclick="authManager.showLoginModal()" class="btn-login-trigger">
-                    🔐 登录 / 注册
+                <button onclick="authManager.showLoginModal()" class="btn-login-trigger" title="登录 / 注册">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
                 </button>
             `;
         }
@@ -491,7 +495,7 @@ class AuthManager {
                 <div class="modal-content auth-modal-content">
                     <button class="modal-close" onclick="authManager.closeModal()">×</button>
                     
-                    <h2>🔐 欢迎使用 USD 投资追踪器</h2>
+                    <h2>欢迎使用 USD 投资追踪器</h2>
                     <p class="auth-subtitle">登录后可同步数据到云端，多设备访问更便捷</p>
                     
                     <!-- GitHub 登录 -->
@@ -528,7 +532,7 @@ class AuthManager {
                             </div>
                             <button type="button" onclick="authManager.handleEmailLogin()" 
                                     class="btn-primary btn-full-width">
-                                📧 邮箱登录
+                                邮箱登录
                             </button>
                         </div>
 
@@ -548,7 +552,7 @@ class AuthManager {
                             </div>
                             <button type="button" onclick="authManager.handleEmailSignup()" 
                                     class="btn-primary btn-full-width">
-                                ✨ 创建账户
+                                创建账户
                             </button>
                             <p class="auth-hint">注册后需要验证邮箱才能使用完整功能</p>
                         </div>

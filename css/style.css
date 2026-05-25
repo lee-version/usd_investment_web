@@ -974,7 +974,7 @@ td:first-child {
 
 .tab-buttons button.active {
     background: var(--bg-card);
-    color: var(--primary);
+    color: var(--accent);
     box-shadow: 0 2px 4px var(--shadow);
 }
 
@@ -1014,48 +1014,32 @@ td:first-child {
 
 .auth-form-section input:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-light);
-}
-
-.btn-primary {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: var(--radius-sm);
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
-    margin-top: 8px;
-}
-
-.btn-primary:hover {
-    background: var(--primary-dark);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(45, 80, 22, 0.08);
 }
 
 .btn-login-trigger {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 18px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: var(--accent);
     color: #ffffff;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: 50%;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     transition: var(--transition);
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+    box-shadow: 0 2px 8px rgba(45, 80, 22, 0.25);
 }
 
 .btn-login-trigger:hover {
+    background: #1f3a10;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+    box-shadow: 0 4px 12px rgba(45, 80, 22, 0.35);
 }
 
 .user-details {
