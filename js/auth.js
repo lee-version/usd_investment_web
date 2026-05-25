@@ -356,6 +356,8 @@ class AuthManager {
      * 登出
      */
     async logout() {
+        if (!confirm('确定要退出登录吗？')) return;
+
         try {
             if (this.supabaseClient) {
                 const { error } = await this.supabaseClient.auth.signOut();
@@ -367,6 +369,7 @@ class AuthManager {
             this.session = null;
             this.setUser(null);
             console.log('👋 已登出');
+            alert('已退出登录');
         }
     }
 
