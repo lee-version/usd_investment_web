@@ -32,6 +32,7 @@ class StorageManager {
         this._syncTimer = null;
         this._syncDelay = 2000; // 2秒防抖
         this._isSyncing = false;
+        this._cloudFetched = false; // 防止重复拉取云端数据
 
         // 初始化
         this.init();
@@ -252,7 +253,11 @@ class StorageManager {
      */
     async _fetchCloudConfig(userId) {
         if (!userId || !this.supabaseClient) return;
-
+        if (this._cloudFetched) {
+            console.log('⏭️ 云端数据已拉取，跳过重复请求');
+            return;
+        }
+        this._cloudFetched = true;
         console.log('☁️ 从云端拉取用户数据...');
 
         try {
@@ -378,6 +383,8 @@ class StorageManager {
             clearTimeout(this._syncTimer);
             this._syncTimer = null;
         }
+        // 重置云端拉取标记，允许重新登录时再次拉取
+        this._cloudFetched = false;
     }
 
     // ==================== 获取当前用户 ID ====================
