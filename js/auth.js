@@ -88,8 +88,10 @@ class AuthManager {
                     username: session.user.user_metadata?.user_name || 
                              session.user.user_metadata?.full_name ||
                              session.user.email?.split('@')[0] || '用户',
-                    avatarUrl: session.user.user_metadata?.avatar_url ||
-                              session.user.user_metadata?.picture,
+                    avatarUrl: this._getValidAvatarUrl(
+                        session.user.user_metadata?.avatar_url ||
+                        session.user.user_metadata?.picture
+                    ),
                     provider: session.app_metadata?.provider
                 };
                 
@@ -155,6 +157,38 @@ class AuthManager {
             
             alert(`登录失败: ${errorMessage}\n\n提示：即使不登录，你也可以正常使用所有功能！数据将保存在浏览器本地。`);
         }
+    }
+
+    /**
+     * 验证并返回有效的头像 URL
+     * 过滤掉无法访问的占位图服务（如 placeholder.com）
+     * 
+     * @param {string} url - 原始头像 URL
+     * @returns {string|null} 有效的 URL 或 null（使用默认头像）
+     */
+    _getValidAvatarUrl(url) {
+        if (!url) return null;
+        
+        const invalidPatterns = [
+            'placeholder.com',
+            'via.placeholder.com',
+            'avatars0.githubusercontent.com',
+            'avatars1.githubusercontent.com',
+            'avatars2.githubusercontent.com',
+            'avatars3.githubusercontent.com',
+            'github.com/identicons'
+        ];
+        
+        const isInvalid = invalidPatterns.some(pattern => 
+            url.toLowerCase().includes(pattern.toLowerCase())
+        );
+        
+        if (isInvalid) {
+            console.log('🖼️ 过滤无效头像URL:', url, '→ 使用默认头像');
+            return null;
+        }
+        
+        return url;
     }
 
     // ==================== 邮箱认证功能 ====================
@@ -410,7 +444,7 @@ class AuthManager {
                     <img src="${this.user.avatarUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSIxNiIgZmlsbD0iI0U1RTVFNSIvPjxwYXRoIGQ9Ik0xNiAxNkMxOC4yMDYxIDE2IDIwIDE0LjIwNjEgMjAgMTJDMjAgOS43OTA4NiAxOC4yMDkxIDggMTYgOEMxMy43OTA5IDggMTIgOS43OTA4NiAxMiAxMkMxMiAxNC4yMDYxIDEzLjc5MDEgMTYgMTYgMTZaIiBmaWxsPSIjOUI5QjlCIi8+PC9zdmc+'}" 
                          alt="${this.user.username}" 
                          class="user-avatar"
-                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSIxNiIgZmlsbD0iI0U1RUVFNSIvPjxwYXRoIGQ9Ik0xNiAxNkMxOC4yMDYxIDE2IDIwIDE0LjIwNjEgMjAgMTJDMjAgOS43OTA4NiAxOC4yMDkxIDggMTYgOEMxMy43OTA5IDggMTIgOS43OTA4NiAxMiAxMkMxMiAxNC4yMDYxIDEzLjc5MDEgMTYgMTYgMTZaIiBmaWxsPSIjOUI5QjlCIi8+PC9zdmc+'">
+                         onerror="if(!this.dataset.errorHandled){this.dataset.errorHandled='true';this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSIxNiIgZmlsbD0iI0U1RTVFNSIvPjxwYXRoIGQ9Ik0xNiAxNkMxOC4yMDYxIDE2IDIwIDE0LjIwNjEgMjAgMTJDMjAgOS43OTA4NiAxOC4yMDkxIDggMTYgOEMxMy43OTA5IDggMTIgOS43OTA4NiAxMiAxMkMxMiAxNC4yMDYxIDEzLjc5MDEgMTYgMTYgMTZaIiBmaWxsPSIjOUI5QjlCIi8+PC9zdmc+';}">
                     <div class="user-details">
                         <div class="user-name-row">
                             <span class="user-name">${this.user.username || this.user.email}</span>
