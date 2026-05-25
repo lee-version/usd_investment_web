@@ -319,19 +319,24 @@ class StorageManager {
         console.log('🔄 启动云端同步...');
         
         try {
-            // ⭐ 检查用户是否已登录
-            if (this.supabaseClient) {
-                const { data: { session } } = await this.supabaseClient.auth.getSession();
+            // ⭐ 检查用户是否已登录（统一使用 _isUserLoggedIn 方法）
+            const isLoggedIn = await this._isUserLoggedIn();
+            
+            if (isLoggedIn) {
+                // 获取用户信息用于日志
+                let userInfo = '已登录用户';
+                if (window.authManager && window.authManager.user) {
+                    userInfo = window.authManager.user.email || window.authManager.user.username || window.authManager.user.id;
+                }
                 
-                if (session?.user) {
-                    console.log(`✅ 用户已登录: ${session.user.email || session.user.id}`);
-                    
-                    // 记录登录时间戳（用于区分登录前后的数据）
-                    if (!this.loginTimestamp) {
-                        this.loginTimestamp = new Date().toISOString();
-                        localStorage.setItem(this.STORAGE_PREFIX + 'login_timestamp', this.loginTimestamp);
-                        console.log(`🕐 登录时间已记录: ${this.loginTimestamp}`);
-                    }
+                console.log(`✅ 用户已登录: ${userInfo}`);
+                
+                // 记录登录时间戳（用于区分登录前后的数据）
+                if (!this.loginTimestamp) {
+                    this.loginTimestamp = new Date().toISOString();
+                    localStorage.setItem(this.STORAGE_PREFIX + 'login_timestamp', this.loginTimestamp);
+                    console.log(`🕐 登录时间已记录: ${this.loginTimestamp}`);
+                }
                     
                     // 1️⃣ 检查是否有本地数据需要覆盖
                     const hasLocalData = this.buyRecords.length > 0 || this.historyRecords.length > 0;
@@ -378,9 +383,10 @@ class StorageManager {
                     console.log('💡 登录后可启用云同步功能');
                     console.log('📝 本地数据不会同步到云端');
                 }
-            } else {
-                console.log('⚠️ 未连接到云端，使用本地数据');
-            }
+                
+                if (!this.supabaseClient) {
+                    console.log('⚠️ 未连接到云端，使用本地数据');
+                }
             
             // 触发 UI 更新事件
             window.dispatchEvent(new CustomEvent('dataLoaded', { 
@@ -405,8 +411,22 @@ class StorageManager {
         if (!this.supabaseClient) return false;
         
         try {
+            // ⭐ 优先检查 AuthManager 的登录状态（解决双客户端 Session 不共享问题）
+            if (window.authManager && window.authManager.isAuthenticated && window.authManager.isAuthenticated()) {
+                console.log('✅ 通过 AuthManager 确认用户已登录');
+                return true;
+            }
+            
+            // 备用：通过自己的客户端检查 session
             const { data: { session } } = await this.supabaseClient.auth.getSession();
-            return !!session?.user;
+            
+            if (session?.user) {
+                console.log('✅ 通过 StorageManager Session 确认用户已登录');
+                return true;
+            }
+            
+            console.log('⚠️ 用户未登录（两个客户端均未检测到有效 Session）');
+            return false;
         } catch (error) {
             console.warn('检查登录状态失败:', error.message);
             return false;
