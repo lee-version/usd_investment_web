@@ -229,6 +229,9 @@ class StorageManager {
                 // 使用代理后的 URL（如果有代理）或原始 URL
                 const effectiveUrl = this.supabaseUrl;
                 
+                // ⭐ 创建带超时和重试的 fetch 包装器
+                const enhancedFetch = this._createEnhancedFetch();
+                
                 this.supabaseClient = window.supabase.createClient(
                     effectiveUrl, 
                     this.supabaseAnonKey,
@@ -238,17 +241,44 @@ class StorageManager {
                             persistSession: true,
                             detectSessionInUrl: true
                         },
-                        // 自定义 fetch（可选，用于调试）
-                        // fetch: (url, options) => {
-                        //     console.log('🌐 API 请求:', url);
-                        //     return fetch(url, options);
-                        // }
+                        fetch: enhancedFetch  // 使用增强版 fetch
                     }
                 );
                 
                 if (this.proxyUrl) {
                     console.log('✅ Supabase 客户端初始化成功（通过代理）');
                     console.log(`   代理地址: ${this.proxyUrl}`);
+                    
+                    // ⭐ 测试代理连接是否可用
+                    const proxyConnected = await this._testProxyConnection();
+                    if (!proxyConnected) {
+                        console.warn('⚠️ 代理连接测试失败，尝试直连模式...');
+                        
+                        // 尝试切换到直连模式
+                        this.proxyUrl = '';
+                        this.supabaseUrl = this.supabaseOriginalUrl;
+                        
+                        try {
+                            this.supabaseClient = window.supabase.createClient(
+                                this.supabaseUrl,
+                                this.supabaseAnonKey,
+                                {
+                                    auth: {
+                                        autoRefreshToken: true,
+                                        persistSession: true,
+                                        detectSessionInUrl: true
+                                    },
+                                    fetch: this._createEnhancedFetch()
+                                }
+                            );
+                            console.log('✅ 已切换到直连模式（需要 VPN/代理）');
+                        } catch (directError) {
+                            console.error('❌ 直连模式也失败:', directError.message);
+                            console.warn('⚠️ 将使用纯本地模式运行');
+                            this.supabaseClient = null;
+                            return false;
+                        }
+                    }
                 } else {
                     console.log('✅ Supabase 客户端初始化成功（直连模式）');
                 }
@@ -306,6 +336,114 @@ class StorageManager {
             
             document.head.appendChild(script);
         });
+    }
+
+    /**
+     * 创建增强版 fetch（带超时、重试和错误处理）
+     * 
+     * 解决问题：
+     * 1. Worker 代理连接不稳定导致 ERR_CONNECTION_CLOSED
+     * 2. Supabase 响应慢导致请求挂起
+     * 3. 网络波动导致的临时性失败
+     */
+    _createEnhancedFetch() {
+        const self = this;
+        const TIMEOUT_MS = 15000;  // 15秒超时
+        const MAX_RETRIES = 2;     // 最大重试次数
+        
+        return async function enhancedFetch(url, options = {}) {
+            let lastError = null;
+            
+            for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+                try {
+                    // ⏱️ 添加超时控制
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+                    
+                    console.log(`🌐 [API] 请求 ${attempt + 1}/${MAX_RETRIES + 1}: ${url}`);
+                    
+                    const response = await fetch(url, {
+                        ...options,
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    // ✅ 成功响应
+                    if (response.ok) {
+                        console.log(`✅ [API] 请求成功: ${response.status}`);
+                        return response;
+                    }
+                    
+                    // ❌ HTTP 错误（但不重试 4xx 客户端错误）
+                    if (response.status >= 400 && response.status < 500) {
+                        console.warn(`⚠️ [API] 客户端错误 ${response.status}: ${url}`);
+                        return response;
+                    }
+                    
+                    // ⚠️ 5xx 服务器错误，可以重试
+                    console.warn(`⚠️ [API] 服务器错误 ${response.status}，准备重试...`);
+                    lastError = new Error(`HTTP ${response.status}`);
+                    
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    lastError = error;
+                    
+                    // 🔄 判断是否可重试
+                    const isRetryable = 
+                        error.name === 'AbortError' ||           // 超时
+                        error.message?.includes('Failed to fetch') ||  // 连接失败
+                        error.message?.includes('NetworkError') ||    // 网络错误
+                        error.message?.includes('ERR_CONNECTION');    // 连接关闭
+                    
+                    if (!isRetryable) {
+                        console.error('❌ [API] 不可重试的错误:', error.message);
+                        throw error;
+                    }
+                    
+                    if (attempt < MAX_RETRIES) {
+                        console.warn(`⚠️ [API] 请求失败 (${error.message})，${1}s 后重试...`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+            }
+            
+            // 💥 所有重试都失败
+            console.error('❌ [API] 所有重试均失败:', lastError?.message);
+            throw lastError || new Error('请求失败');
+        };
+    }
+
+    /**
+     * 测试代理连接是否可用
+     * 通过发送一个简单的健康检查请求来验证 Worker 代理是否正常工作
+     * 
+     * @returns {Promise<boolean>} 连接是否成功
+     */
+    async _testProxyConnection() {
+        if (!this.supabaseClient) return false;
+        
+        console.log('🔍 测试代理连接...');
+        
+        try {
+            // 发送一个简单的查询（只查表结构，不查数据）
+            const { error } = await this.supabaseClient
+                .from(this.TABLES.BUY_RECORDS)
+                .select('id')
+                .limit(1);
+            
+            if (error) {
+                console.warn('⚠️ 代理连接测试失败:', error.message);
+                return false;
+            }
+            
+            console.log('✅ 代理连接测试通过');
+            return true;
+            
+        } catch (error) {
+            console.warn('⚠️ 代理连接异常:', error.message);
+            return false;
+        }
     }
 
     /**
