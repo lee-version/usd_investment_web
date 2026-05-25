@@ -736,48 +736,110 @@ td:first-child {
     margin-left: auto;
 }
 
-.user-info {
+.user-menu {
+    position: relative;
+}
+
+.user-avatar-btn {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 12px;
-    background: var(--bg-card);
-    border-radius: var(--radius-sm);
-    box-shadow: 0 2px 8px var(--shadow);
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: var(--accent);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: 0 2px 8px rgba(45, 80, 22, 0.25);
+    overflow: hidden;
 }
 
-.user-avatar {
-    width: 32px;
-    height: 32px;
+.user-avatar-btn:hover {
+    background: #1f3a10;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(45, 80, 22, 0.35);
+}
+
+.user-avatar-btn .user-avatar {
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     object-fit: cover;
-    border: 2px solid var(--border-light);
+    border: none;
 }
 
-.user-name {
+.user-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    padding: 16px;
+    min-width: 200px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: all 0.2s ease;
+    z-index: 200;
+}
+
+.user-menu:hover .user-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.user-dropdown-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.user-dropdown-name {
     font-size: 14px;
     font-weight: 500;
     color: var(--text-primary);
-    max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.btn-logout {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 6px;
-    border-radius: 6px;
+.user-dropdown-email {
+    font-size: 12px;
     color: var(--text-secondary);
-    transition: var(--transition);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 12px;
 }
 
-.btn-logout:hover {
+.user-dropdown-divider {
+    height: 1px;
+    background: var(--border-light);
+    margin: 8px 0;
+}
+
+.user-dropdown-logout {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.user-dropdown-logout:hover {
     background: var(--negative-light);
     color: var(--negative);
 }
@@ -818,10 +880,6 @@ td:first-child {
         position: absolute;
         top: 12px;
         right: 16px;
-    }
-
-    .user-name {
-        display: none;
     }
 
     .btn-github-login span {
@@ -1040,27 +1098,6 @@ td:first-child {
     background: #1f3a10;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(45, 80, 22, 0.35);
-}
-
-.user-details {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.user-name-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.user-email {
-    font-size: 11px;
-    color: var(--text-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 150px;
 }
 
 .verification-badge {

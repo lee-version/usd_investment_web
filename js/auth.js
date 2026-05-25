@@ -454,26 +454,30 @@ class AuthManager {
                    </span>`;
             
             authContainer.innerHTML = `
-                <div class="user-info">
-                    <img src="${this.user.avatarUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSIxNiIgZmlsbD0iI0U1RTVFNSIvPjxwYXRoIGQ9Ik0xNiAxNkMxOC4yMDYxIDE2IDIwIDE0LjIwNjEgMjAgMTJDMjAgOS43OTA4NiAxOC4yMDkxIDggMTYgOEMxMy43OTA5IDggMTIgOS43OTA4NiAxMiAxMkMxMiAxNC4yMDYxIDEzLjc5MDEgMTYgMTYgMTZaIiBmaWxsPSIjOUI5QjlCIi8+PC9zdmc+'}" 
-                         alt="${this.user.username}" 
-                         class="user-avatar"
-                         onerror="if(!this.dataset.errorHandled){this.dataset.errorHandled='true';this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSIxNiIgZmlsbD0iI0U1RTVFNSIvPjxwYXRoIGQ9Ik0xNiAxNkMxOC4yMDYxIDE2IDIwIDE0LjIwNjEgMjAgMTJDMjAgOS43OTA4NiAxOC4yMDkxIDggMTYgOEMxMy43OTA5IDggMTIgOS43OTA4NiAxMiAxMkMxMiAxNC4yMDYxIDEzLjc5MDEgMTYgMTYgMTZaIiBmaWxsPSIjOUI5QjlCIi8+PC9zdmc+';}">
-                    <div class="user-details">
-                        <div class="user-name-row">
-                            <span class="user-name">${this.user.username || this.user.email}</span>
+                <div class="user-menu">
+                    <button class="user-avatar-btn" title="${this.user.username || this.user.email}">
+                        <img src="${this.user.avatarUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0yMCAyMXYtMmE0IDQgMCAwIDAtNC00SDhhNCA0IDAgMCAwLTQgNHYyIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMTIiIGN5PSI3IiByPSI0IiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+'}" 
+                             alt="${this.user.username}" 
+                             class="user-avatar"
+                             onerror="if(!this.dataset.errorHandled){this.dataset.errorHandled='true';this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0yMCAyMXYtMmE0IDQgMCAwIDAtNC00SDhhNCA0IDAgMCAwLTQgNHYyIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMTIiIGN5PSI3IiByPSI0IiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+';}">
+                    </button>
+                    <div class="user-dropdown">
+                        <div class="user-dropdown-header">
+                            <span class="user-dropdown-name">${this.user.username || this.user.email}</span>
                             ${this.user.email ? verificationBadge : ''}
                         </div>
-                        ${this.user.email ? `<small class="user-email">${this.user.email}</small>` : ''}
+                        ${this.user.email ? `<div class="user-dropdown-email">${this.user.email}</div>` : ''}
+                        <div class="user-dropdown-divider"></div>
+                        <button onclick="authManager.logout()" class="user-dropdown-logout">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                            退出登录
+                        </button>
                     </div>
-                    <button onclick="authManager.logout()" class="btn-logout" title="退出登录">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                            <polyline points="16 17 21 12 16 7"></polyline>
-                            <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                    </button>
                 </div>
             `;
         } else {
