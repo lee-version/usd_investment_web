@@ -443,7 +443,9 @@ class StorageManager {
     }
 
     async deleteBuyRecords(ids) {
-        this.buyRecords = this.buyRecords.filter(r => !ids.includes(r.id));
+        // ids 可能是字符串（来自 checkbox value），统一转为数字比较
+        const numIds = ids.map(id => Number(id));
+        this.buyRecords = this.buyRecords.filter(r => !numIds.includes(Number(r.id)));
         this._saveToLocalStorage();
         this._markDirty();
         console.log(`🗑️ 删除 ${ids.length} 条买入记录`);
@@ -493,7 +495,9 @@ class StorageManager {
     }
 
     async deleteHistoryRecords(ids) {
-        this.historyRecords = this.historyRecords.filter(r => !ids.includes(r.id));
+        // ids 可能是字符串（来自 checkbox value），统一转为数字比较
+        const numIds = ids.map(id => Number(id));
+        this.historyRecords = this.historyRecords.filter(r => !numIds.includes(Number(r.id)));
         this._saveToLocalStorage();
         this._markDirty();
         console.log(`🗑️ 删除 ${ids.length} 条历史记录`);
