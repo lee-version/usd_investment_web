@@ -33,28 +33,24 @@
 |------|------|------|
 | **前端** | HTML5 + CSS3 + JavaScript | 原生开发，无框架依赖 |
 | **图表库** | Plotly.js (v2.27.0) | 专业数据可视化 |
-| **后端** | Node.js + Express | RESTful API 服务 |
-| **数据库** | MySQL | 数据持久化存储 |
+| **后端/数据库** | Supabase (PostgreSQL) | 云端数据库 + 认证服务 |
 | **样式设计** | 日式简约美学 | 米白/炭黑/墨绿配色 |
 
 ## 📁 项目结构
 
 ```
-财务/
+usd_investment_web/
 ├── index.html              # 主页面（4个视图模块）
-├── server.js               # Node.js 后端服务器
-├── database.js             # MySQL 数据库连接配置
-├── package.json            # Node.js 依赖配置
-│
-├── 快速启动.bat             # ⭐ Windows 启动脚本（显示日志窗口）
-├── 静默启动.vbs             # ⭐ Windows 静默启动脚本（无窗口）
 ├── .gitignore              # Git 忽略配置
+├── .env.example            # 环境变量示例
 │
 ├── css/
 │   └── style.css           # 全局样式（日式简约风格）
 │
 ├── js/
-│   ├── storage.js          # 数据访问层（API 调用封装）
+│   ├── config.js           # Supabase 配置
+│   ├── auth.js             # 认证管理（GitHub + 邮箱登录）
+│   ├── storage.js          # 数据访问层（localStorage + Supabase）
 │   ├── calculator.js       # 收益计算逻辑引擎
 │   ├── charts.js           # 图表渲染（Plotly 封装）
 │   └── app.js              # 主应用（事件绑定、视图控制）
@@ -62,199 +58,56 @@
 └── README.md               # 项目文档（本文件）
 ```
 
-## 🗄️ 数据库设计
+## 🗄️ 数据存储
 
-### 表结构
+项目使用 **Supabase** (PostgreSQL) 作为云端数据库，同时前端使用 **localStorage** 作为本地缓存，实现离线可用 + 云端同步。
 
-#### 1️⃣ `buy_records` - 买入记录表
-
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| `id` | INT (PK) | 主键自增 |
-| `buy_time` | DATETIME | 买入日期时间 |
-| `buy_rate` | DECIMAL(10,4) | 买入时的汇率 |
-| `usd_amount` | DECIMAL(12,2) | 买入的美元数量 |
-| `cost_cny` | DECIMAL(14,2) | 成本（人民币） |
-| `created_at` | TIMESTAMP | 创建时间 |
-
-#### 2️⃣ `history_records` - 历史计算记录表
-
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| `id` | INT (PK) | 主键自增 |
-| `query_time` | DATETIME | 计算日期时间 |
-| `current_hold_usd` | DECIMAL(12,2) | 当前持有的美元数量 |
-| `current_rate` | DECIMAL(10,4) | 计算时的当前汇率 |
-| `finance_roi` | DECIMAL(8,4) | 理财收益率（%） |
-| `finance_profit_usd` | DECIMAL(12,2) | 理财收益（美元） |
-| `rate_profit_cny` | DECIMAL(14,2) | 汇率盈亏（人民币） |
-| `total_profit_cny` | DECIMAL(14,2) | 总盈亏（人民币） |
-| `total_roi` | DECIMAL(8,4) | 总收益率（%） |
-| `created_at` | TIMESTAMP | 创建时间 |
-
-#### 3️⃣ `config` - 系统配置表
-
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| `id` | INT (PK) | 主键 |
-| `current_hold_usd` | DECIMAL(12,2) | 上次的持仓数量 |
-| `current_rate` | DECIMAL(10,4) | 上次使用的汇率 |
-| `updated_at` | TIMESTAMP | 更新时间 |
-
-### 数据关系
+### 数据架构
 
 ```
-buy_records ──→ 计算基准数据
-    ↓
-history_records ← 保存每次计算的结果（包含 current_rate）
-    ↓
-config ──────→ 存储用户偏好（自动填充用）
+localStorage（本地缓存） ←→ Supabase（云端数据库）
+       ↑ 离线优先                   ↑ 登录后自动同步
+       ↓ 防抖批量上传               ↓ 多设备数据共享
 ```
 
 ## 🚀 安装和运行
 
 ### 前置要求
 
-- **Node.js** (v16 或更高版本)
-- **MySQL** (5.7 或更高版本)
 - 现代浏览器（Chrome/Firefox/Edge）
+- 可选：Supabase 账号（用于云端同步，不登录也可使用本地模式）
 
-### 步骤 1: 配置数据库连接
+### 步骤 1: 配置 Supabase
 
-编辑 [database.js](database.js) 文件：
+编辑 [js/config.js](js/config.js) 文件，填入你的 Supabase 项目信息：
 
 ```javascript
-module.exports = {
-    host: '127.0.0.1',      // 数据库地址
-    port: 3306,             // 端口
-    user: 'root',           // 用户名
-    password: '你的密码',     // 密码
-    database: 'usd_invest'  // 数据库名称
-};
+window.SUPABASE_URL = 'https://your-project-id.supabase.co';
+window.SUPABASE_ANON_KEY = 'your-anon-key';
+window.SITE_URL = 'https://your-site-url.com';
 ```
 
-### 步骤 2: 创建数据库表
+### 步骤 2: 启动应用
 
-在 MySQL 中执行以下 SQL（如果表不存在）：
+这是一个纯静态前端项目，可以通过任何 HTTP 服务器运行：
 
-```sql
-CREATE DATABASE IF NOT EXISTS usd_invest CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+**方式 A：使用 VS Code Live Server**
+- 安装 Live Server 扩展
+- 右键 `index.html` → "Open with Live Server"
 
-USE usd_invest;
-
--- 买入记录表
-CREATE TABLE IF NOT EXISTS buy_records (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    buy_time DATETIME NOT NULL,
-    buy_rate DECIMAL(10,4) NOT NULL,
-    usd_amount DECIMAL(12,2) NOT NULL,
-    cost_cny DECIMAL(14,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 历史计算记录表
-CREATE TABLE IF NOT EXISTS history_records (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    query_time DATETIME NOT NULL,
-    current_hold_usd DECIMAL(12,2) NOT NULL,
-    current_rate DECIMAL(10,4) NOT NULL,
-    finance_roi DECIMAL(8,4) DEFAULT 0,
-    finance_profit_usd DECIMAL(12,2) DEFAULT 0,
-    rate_profit_cny DECIMAL(14,2) DEFAULT 0,
-    total_profit_cny DECIMAL(14,2) DEFAULT 0,
-    total_roi DECIMAL(8,4) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 配置表
-CREATE TABLE IF NOT EXISTS config (
-    id INT PRIMARY KEY DEFAULT 1,
-    current_hold_usd DECIMAL(12,2) DEFAULT 0,
-    current_rate DECIMAL(10,4) DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-INSERT INTO config (id) VALUES (1);
-```
-
-### 步骤 3: 安装依赖并启动服务
-
-#### 方式 A：使用启动脚本（推荐）⭐
-
-**Windows 用户：双击运行**
-
-提供两种启动脚本，根据需求选择：
-
-| 脚本 | 文件名 | 窗口显示 | 适用场景 |
-|------|--------|---------|---------|
-| 📋 **调试版** | `快速启动.bat` | ✅ 显示完整日志窗口 | 排查问题、查看错误信息 |
-| 🚀 **静默版** | `静默启动.vbs` | 🔇 完全无窗口 | **日常使用（推荐）** |
-
-##### 使用方法：
-
-**1. 快速启动.bat（调试用）**
-- 双击运行
-- 显示服务器日志和错误信息
-- 按 `Ctrl+C` 或关闭窗口停止服务器
-
-**2. 静默启动.vbs（日常推荐）⭐**
-- 双击运行
-- **无任何窗口弹出**
-- 3秒后浏览器自动打开
-- 服务器在后台运行
-- 可创建桌面快捷方式并设置自定义图标
-
-**两种脚本都会自动：**
-1. ✅ 检查 Node.js 环境
-2. ✅ 自动安装依赖（首次）
-3. ✅ 启动服务器
-4. ✅ 打开浏览器访问 http://localhost:3000
-
-#### 方式 B：手动命令行启动
-
+**方式 B：使用 Python**
 ```bash
-# 进入项目目录
-cd 财务
-
-# 安装 Node.js 依赖（首次运行）
-npm install
-
-# 启动后端服务器
-node server.js
+python -m http.server 3000
 ```
 
-启动成功后会看到：
-
-```
-✅ 数据库连接成功
-🚀 服务器运行在 http://localhost:3000
-
-📡 API 端点:
-   📥 GET /api/buy-records      - 获取买入记录
-   📤 POST /api/buy-records      - 添加买入记录
-   🗑️ DELETE /api/buy-records    - 删除买入记录
-   
-   📊 GET /api/history-records   - 获取历史记录
-   📤 POST /api/history-records   - 保存计算结果
-   🗑️ DELETE /api/history-records - 删除历史记录
-   
-   ⚙️ GET /api/config            - 获取配置
-   ✏️ PUT /api/config            - 更新配置
+**方式 C：使用 Node.js**
+```bash
+npx serve .
 ```
 
-### 步骤 4: 访问应用
+然后访问 `http://localhost:3000`
 
-⚠️ **重要提示：必须通过 HTTP 服务器访问！**
-
-在浏览器地址栏输入：
-
-```
-http://localhost:3000
-```
-
-❌ **不要直接双击 `index.html` 文件**（会导致数据无法加载）
-
-原因：这是一个前后端分离的应用，需要通过 HTTP 服务器访问 API 接口获取数据。
+> ⚠️ 不要直接双击 `index.html` 文件（部分功能受限）
 
 ## 📖 使用指南
 
@@ -325,72 +178,16 @@ http://localhost:3000
 - 更新核心指标和所有图表
 - 显示加载状态反馈
 
-## 🔧 API 接口文档
+## 🔧 API 接口
 
-### 买入记录 API
+项目直接通过 Supabase JavaScript SDK 与 PostgreSQL 数据库交互，无需中间 API 层。
 
-```
-GET    /api/buy-records          获取所有买入记录（倒序）
-POST   /api/buy-records          新增买入记录
-DELETE /api/buy-records          批量删除（body: { ids: [] }）
-GET    /api/buy-records/stats    获取统计信息
-```
+数据存储在以下 Supabase 表中：
+- `buy_records` - 买入记录
+- `history_records` - 历史计算结果
+- `config` - 用户配置
 
-**请求示例（POST）：**
-
-```json
-{
-    "date": "2026-03-09",
-    "rate": 6.9141,
-    "amount": 100
-}
-```
-
-**响应示例：**
-
-```json
-{
-    "success": true,
-    "message": "添加成功",
-    "data": {
-        "id": 1,
-        "date": "2026-03-09",
-        "usdAmount": 100,
-        "buyRate": 6.9141,
-        "costCNY": 691.41
-    }
-}
-```
-
-### 历史记录 API
-
-```
-GET    /api/history-records      获取所有历史记录（倒序）
-POST   /api/history-records      保存计算结果
-DELETE /api/history-records      批量删除（body: { ids: [] }）
-```
-
-**请求示例（POST）：**
-
-```json
-{
-    "queryTime": "2026-03-09 02:58",
-    "currentHoldUSD": 946.40,
-    "currentRate": 6.9141,
-    "financeROI": 0.15,
-    "financeProfitUSD": 1.40,
-    "rateProfitCNY": -146.73,
-    "totalProfitCNY": -137.33,
-    "totalROI": -2.24
-}
-```
-
-### 配置 API
-
-```
-GET /api/config   获取当前配置
-PUT /api/config   更新配置
-```
+认证通过 Supabase Auth 管理，支持 GitHub OAuth 和邮箱密码登录。
 
 ## 🎨 设计特点
 
@@ -415,10 +212,9 @@ PUT /api/config   更新配置
 
 ## ⚠️ 注意事项
 
-1. **数据库安全**
-   - 生产环境请修改默认密码
-   - 建议使用环境变量管理敏感信息
-   - 定期备份数据库
+1. **数据安全**
+   - 敏感配置在 `js/config.js` 中，请勿提交到公开仓库
+   - 建议在 Supabase 中启用 RLS 策略限制数据访问
 
 2. **性能优化**
    - 大量数据时建议添加分页功能
@@ -435,6 +231,14 @@ PUT /api/config   更新配置
 
 ## 📝 开发日志
 
+### v2.0.0 (2026-05-26)
+
+- ✅ 迁移至 Supabase 直连架构（移除 MySQL/Express 依赖）
+- ✅ 清理过时文件：迁移脚本、Cloudflare Worker、诊断工具
+- ✅ 优化代码：修复 CSS 变量、移除冗余逻辑
+- ✅ 新增 Supabase Auth 认证（GitHub + 邮箱登录）
+- ✅ 离线优先存储策略（localStorage + 防抖云端同步）
+
 ### v1.1.0 (2026-05-13)
 
 - ✅ 新增静默启动脚本（`静默启动.vbs`）- 完全无窗口启动
@@ -442,7 +246,6 @@ PUT /api/config   更新配置
 - ✅ 修复核心指标：将"最高/最低总收益率"改为"最高/最低总收益"（绝对金额）
 - ✅ 修复收益率显示重复 % 符号的问题
 - ✅ 优化页面初始化：预加载所有数据，提升用户体验
-- ✅ 启动脚本支持任意位置运行（固定项目路径）
 
 ### v1.0.0 (2026-05-12)
 

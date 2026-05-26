@@ -22,7 +22,6 @@ class App {
             await this.renderHistoryRecords();
         } catch (error) {
             console.error('初始化数据加载失败', error);
-            alert('连接数据库失败，请确保后端服务已启动');
         }
 
         // 窗口大小改变时重绘图表
@@ -349,14 +348,14 @@ class App {
                 holdingAmount,
                 currentRate,
                 avgCostRate: stats.avgCostRate,
-                originalCost: Calculator._round(originalCost),
-                currentValue: Calculator._round(currentValue),
-                financialIncome: Calculator._round(financialIncome),
-                financialYield: Calculator._round(financialYield),
-                exchangeProfit: Calculator._round(exchangeProfit),
-                exchangeYield: Calculator._round(exchangeYield),
-                totalProfit: Calculator._round(totalProfit),
-                totalYield: Calculator._round(totalYield),
+                originalCost: parseFloat(originalCost.toFixed(2)),
+                currentValue: parseFloat(currentValue.toFixed(2)),
+                financialIncome: parseFloat(financialIncome.toFixed(2)),
+                financialYield: parseFloat(financialYield.toFixed(2)),
+                exchangeProfit: parseFloat(exchangeProfit.toFixed(2)),
+                exchangeYield: parseFloat(exchangeYield.toFixed(2)),
+                totalProfit: parseFloat(totalProfit.toFixed(2)),
+                totalYield: parseFloat(totalYield.toFixed(2)),
                 totalHoldingUSD: stats.totalHoldingUSD,
                 totalCostCNY: stats.totalCostCNY
             };
@@ -618,7 +617,6 @@ class App {
             console.log('✅ 应用初始化完成');
         } catch (error) {
             console.error('❌ 应用初始化失败:', error);
-            alert('刷新数据失败，请检查网络连接');
         }
     }
 }

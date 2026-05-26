@@ -547,10 +547,7 @@ class Charts {
      */
     async refreshAll() {
         try {
-            const [buyRecords, historyRecords] = await Promise.all([
-                storageManager.getBuyRecords(),
-                storageManager.getHistoryRecords()
-            ]);
+            const historyRecords = await storageManager.getHistoryRecords();
 
             // 渲染核心指标
             await this.renderCoreMetrics();
