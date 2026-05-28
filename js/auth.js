@@ -21,13 +21,24 @@ class AuthManager {
         console.log('🔐 AuthManager v3.0 初始化...');
         
         try {
-            await this.initSupabaseClient();
-            await this.checkSession();
-            this.handleCallback();
+            await Promise.race([
+                this._doInit(),
+                new Promise((resolve) => setTimeout(() => {
+                    console.warn('⚠️ 认证初始化超时(3秒)，使用访客模式');
+                    this.setUser(null);
+                    resolve();
+                }, 3000))
+            ]);
         } catch (error) {
             console.warn('⚠️ 认证初始化失败，使用访客模式:', error.message);
             this.setUser(null);
         }
+    }
+
+    async _doInit() {
+        await this.initSupabaseClient();
+        await this.checkSession();
+        this.handleCallback();
     }
 
     /**

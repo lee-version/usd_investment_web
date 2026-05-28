@@ -344,7 +344,7 @@ class App {
             const totalYield = originalCost > 0 ? (totalProfit / originalCost) * 100 : 0;
 
             this.lastResult = {
-                queryTime: new Date().toISOString().substring(0, 10),
+                queryTime: calcDate,
                 holdingAmount,
                 currentRate,
                 avgCostRate: stats.avgCostRate,

@@ -47,14 +47,34 @@ class StorageManager {
         this._loadFromLocalStorage();
         console.log(`📥 本地数据已加载: ${this.buyRecords.length} 条买入, ${this.historyRecords.length} 条历史`);
 
-        // 2. 初始化 Supabase 客户端（复用 AuthManager 的实例）
-        await this._initSupabase();
+        // 2. 初始化 Supabase 客户端（带超时保护）
+        try {
+            await Promise.race([
+                this._initSupabase(),
+                new Promise((resolve) => setTimeout(() => {
+                    console.warn('⚠️ Supabase 初始化超时(3秒)，切换到本地模式');
+                    resolve();
+                }, 3000))
+            ]);
+        } catch (error) {
+            console.warn('⚠️ Supabase 初始化失败，使用纯本地模式:', error.message);
+        }
 
-        // 3. 如果已登录，从云端拉取最新数据
+        // 3. 如果已登录，从云端拉取最新数据（带超时保护）
         if (this.supabaseClient) {
-            const userId = await this._getUserIdAsync();
-            if (userId) {
-                await this._fetchCloudConfig(userId);
+            try {
+                const userId = await this._getUserIdAsync();
+                if (userId) {
+                    await Promise.race([
+                        this._fetchCloudConfig(userId),
+                        new Promise((resolve) => setTimeout(() => {
+                            console.warn('⚠️ 云端数据拉取超时(5秒)，使用本地数据');
+                            resolve();
+                        }, 5000))
+                    ]);
+                }
+            } catch (error) {
+                console.warn('⚠️ 云端数据拉取失败，使用本地数据:', error.message);
             }
         }
 
